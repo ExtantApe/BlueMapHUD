@@ -1,0 +1,101 @@
+# BlueMapHUD configuration. Apply changes with /bmhud reload.
+
+tiles:
+  # file: read BlueMap's folder directly (fastest, file storage only).
+  # http: fetch from BlueMap's webserver (also works with SQL storage).
+  source: file
+  # Folder holding "<map id>/tiles". Empty means "<BlueMap webroot>/maps".
+  web-root: ""
+  http-url: "http://127.0.0.1:8100"
+  refresh-minutes: 10
+  # Number of 64x64 cell chunks kept in memory (about 16 KB each).
+  cache-chunks: 512
+  # Force a map per world, for example:  world_nether: nether
+  map-overrides: {}
+
+hud:
+  enabled-by-default: true
+  # boss-bar or action-bar. Action bar flickers if other plugins also use it.
+  channel: boss-bar
+  update-ticks: 5
+  # small, medium or large (24, 32 or 40 cells).
+  size: medium
+  # Blocks per cell. One of 1, 2, 4, 8, 16, 32, 64.
+  zoom: 2
+  # GUI pixels per cell. Changing this rebuilds the resource pack.
+  cell-pixels: 2
+  # Starting offset from the top centre of the screen, in GUI pixels.
+  offset-x: 0
+  offset-y: 0
+  # Largest /hud offset y a player may use. Changing this rebuilds the pack.
+  max-offset-y: 64
+  # How far left or right of centre /hud corner moves the map.
+  corner-x: 170
+  coords: true
+  # Rounds colours to this step so runs get longer and packets get smaller.
+  color-step: 8
+  # Shown where BlueMap has no tile yet.
+  void-color: "#14161a"
+  auto-hide:
+    while-fullscreen: true
+    other-boss-bar: true
+    spectator: true
+    # Sneak + F while looking straight down toggles the minimap.
+    quick-hide-gesture: false
+
+commands:
+  # The first name no other plugin owns is used. /bmhud map, /bmhud hud,
+  # /bluemaphud:map and /bluemaphud:hud always work.
+  map-names: [map, worldmap]
+  hud-names: [hud, minimap]
+
+fullscreen:
+  enabled: true
+  # Sneak + F opens and closes the map.
+  sneak-swap-toggle: true
+  width: 96
+  height: 54
+  cell-pixels: 3
+  zoom: 8
+  # Seconds before it closes on its own. 0 keeps it open.
+  timeout-seconds: 60
+  # Brightness of the map behind the icons, from 0.0 to 1.0.
+  brightness: 0.75
+
+players:
+  # Blocks. Players farther away are not shown.
+  radius: 512
+  hide-vanished: true
+  hide-spectators: true
+  hide-invisible: true
+  # Respect players hidden in BlueMap's web map.
+  hide-bluemap-hidden: true
+  # Show arrows on the map edge for players in range but off the map.
+  edge-arrows: false
+
+markers:
+  enabled: true
+  # Empty include means every marker set.
+  include: []
+  exclude: []
+  # Show arrows on the map edge for POIs and your death point.
+  edge-arrows: true
+  show-death: true
+
+pack:
+  # false means your own merged pack provides the files. See /bmhud pack export.
+  send: true
+  required: true
+  kick-message: "This server needs the BlueMapHUD resource pack."
+  prompt: "BlueMapHUD draws the map with this small resource pack."
+  port: 8164
+  # Host players download from. Empty uses the address they connected to.
+  host: ""
+  # Host the pack elsewhere, such as a CDN or GitHub release. Overrides the port.
+  public-url: ""
+  # Make one boss bar colour transparent. Turn off only with the action bar.
+  hide-boss-bar: true
+  # Pick a colour no other pack restyles: pink, blue, red, green, yellow, purple, white.
+  boss-bar-color: pink
+  bedrock-exempt: true
+  re-send-on-removal: true
