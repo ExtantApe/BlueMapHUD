@@ -2,7 +2,7 @@
 
 A lightweight Paper plugin that shows a [BlueMap](https://bluemap.bluecolored.de/)-sourced minimap and fullscreen map on the player's screen. It uses a small resource pack with its own namespace: no client mods, no shader overrides and no held map items.
 
-**Status:** pre-release. It has run on live Paper servers with a protocol bot, but not yet with a real game client or rendered BlueMap tiles. See [Testing](#testing).
+**Status:** pre-release. It has passed a full test suite on live Paper 1.21.11 and 26.3 servers with real BlueMap tiles, using a protocol bot. It hasn't been seen in a real game client yet. See [Testing](#testing).
 
 - Requires Paper 1.21.11 or newer, and a BlueMap version that matches your server (see below). Java Edition only.
 - Works alongside other resource packs, because it never overrides a shader and only adds its own files.
@@ -66,6 +66,8 @@ The plugin sends its pack alongside any others using the multi-pack API, and pla
 - **Other boss bars:** the minimap hides for Adventure boss bars, registered Bukkit bars and the Wither and Ender Dragon. A bar made with Bukkit's unregistered `createBossBar` can't be detected, so the minimap stays up and the two share the screen.
 - **Vertical position:** `/hud offset y` moves in whole map cells, up to `hud.max-offset-y`.
 - **Action bar mode:** the map sits above the hotbar and can flicker if another plugin also uses the action bar. The fullscreen map still uses a boss bar.
+- **Other pink boss bars:** the pack makes one boss bar colour transparent, so another plugin's bar in that colour disappears too. Choose a colour with `pack.boss-bar-color` that nothing else uses.
+- **Repeated pack wipes:** the pack is re-sent once per session. If another plugin clears packs again, the map stays hidden for that player until they rejoin. This is what stops two plugins fighting in a loop.
 - **Bedrock players:** Geyser and Floodgate players don't get a map, because they can't use the pack.
 
 ## How it works
@@ -88,30 +90,41 @@ Real terrain has more colour variation than the test map, so expect larger updat
 
 `./gradlew build` compiles against the Paper 1.21.11 API and runs the tests. They include a simulated client that loads the generated pack and draws frames using the font rules read from the Minecraft 26.3 client: glyph advance, the `ascent <= height` check and text centring. It checks that every map cell lands on the right pixels and that no frame drifts.
 
-It's a simulation, so the plugin has also been run on real servers, using a protocol bot as the client.
+The plugin has also been tested on live servers: Paper 1.21.11 with BlueMap 5.18, and Paper 26.3 with BlueMap 5.29. A protocol bot played the client, joining 26.3 through ViaBackwards. Every frame it received was decoded and compared cell by cell with BlueMap's tile files on disk.
 
-**Passed on Paper 1.21.11, with a bot:**
+**Passed on both servers:**
 
-- The pack is pushed as required, downloads with a matching hash, and uses the fixed pack ID.
-- Declining a required pack kicks with the custom message.
-- No boss bar is sent until the client reports the pack loaded.
-- All commands work, including the fallback and namespaced names. Non-ops can't use the admin commands.
-- When another plugin owns `/map` and `/hud`, it keeps them, and BlueMapHUD moves to `/worldmap` and `/minimap`.
-- Sneak + F toggles fullscreen. `/hud off` survives a rejoin.
-- A removed pack hides the map and is re-sent once, with no loop.
-- The boss bar arrives pink with zero progress. Test pattern frames captured off the wire resolve to real glyphs, have no shadow and net to zero advance. One 96x54 frame was drawn back to pixels and looked correct.
+- **Map accuracy:** every zoom level, every size, all three dimensions, negative coordinates, unrendered areas and the fullscreen map. Re-rendered tiles reach the HUD within the refresh time.
+- **Icons and text:** heading arrows at all 8 compass points, player dots, POI markers and labels (including accents, CJK and very long labels), edge arrows, the death point and coordinates.
+- **Hiding:** vanish, `hidePlayer`, spectators, invisibility, players hidden in BlueMap, the radius, other dimensions, permissions, other boss bars, the Wither, the Ender Dragon and every `auto-hide` setting.
+- **Updates:** nothing is sent while idle, and at most 4 updates a second otherwise.
+- **Pack handling:** required, optional, declined and failed downloads, `host`, `public-url`, `send: false`, bar colours, custom icons, and another plugin wiping packs with the old one-pack method.
+- **Life cycle:** `/bmhud reload`, `/bluemap reload`, a full `/reload`, server restarts, saved settings and quick join/quits.
+- **Bad data:** corrupt tiles, a wrong web root, an unreachable webserver and the far edge of the world.
+- **Other setups:** the action bar channel, the HTTP source, and command back-off from another plugin's `plugin.yml` commands.
 
-**Passed on Paper 26.3, server side only:** the plugin loads, registers its commands and serves the pack. A busy pack port gives one clear error, and nothing is sent to players. The bot library has no 26.3 protocol support, so no player joined.
+**Also passed:**
+
+- **SQL storage:** on 1.21.11, tiles held in SQLite through the HTTP source matched the same world rendered to files on all 1024 cells.
+- **Game code:** the Minecraft 26.1.2, 26.2 and 26.3 client code loads the generated pack and fonts, with the game's advances matching this project's for all 9,886 glyphs. The 1.21.11 client's bytecode uses the same glyph advance formula.
+
+**20 moving players, one minute, on real terrain:**
+
+| | Paper 1.21.11 | Paper 26.3 | Budget |
+| --- | --- | --- | --- |
+| Average frame build | 80 µs | 73 µs | 1 ms |
+| Update size, compressed (95th percentile) | 2.3 KB | 2.3 KB | 5 KB |
+| Largest update, compressed | 2.6 KB | 2.5 KB | none |
+| Server tick | 7.8 ms | 8.0 ms | 50 ms |
 
 **Not tested yet:**
 
-- Rendered BlueMap tiles, markers and player dots on a live server. These are only covered by the unit tests.
-- How it looks in a real game client, which the bot can't show. That includes the invisible boss bar, draw order of icons over the map, and clients 1.21.11, 26.1.2, 26.2 and 26.3, each on vanilla, Sodium, and Sodium + Iris with a shader pack.
-- GUI scales 2, 3, 4 and Auto, at widths 1280, 1920 and 2560.
-- ZigZag on the client, and sent by the server.
-- Magic's pack sent before and after ours, with a Magic spell or boss bar showing.
-- A Bedrock join, and BlueMap on SQL storage.
-- Back-off from another plugin's Brigadier commands. The live test used a legacy `plugin.yml` command.
+- A real game client: how the map actually looks, the invisible boss bar, icons drawing over the map, GUI scales and screen widths, Sodium and Iris with a shader pack, and native 26.1 and 26.2 servers.
+- The real Magic plugin. Its pack call was simulated with the same Bukkit method it uses.
+- ZigZag loaded alongside the pack in a client. It overlaps only on the pink boss bar textures, which this pack replaces.
+- A Bedrock join, MySQL or PostgreSQL storage, and back-off from another plugin's Brigadier commands.
+
+To check a real client, join as an op and run `/bmhud debug pattern`. You should see a sharp colour gradient with a white border and no bar behind it.
 
 ## Building
 
