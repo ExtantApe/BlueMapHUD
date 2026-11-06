@@ -62,7 +62,7 @@ public final class BlueMapHudPlugin extends JavaPlugin implements Listener {
         packs = new PackService(this, getDataFolder().toPath().resolve("pack"));
         hud = new HudManager(this, packs);
         rebuildPack();
-        hud.configure(config, null);
+        stopRendering();
 
         getServer().getPluginManager().registerEvents(this, this);
         HudCommands commands = new HudCommands(this);
@@ -114,7 +114,20 @@ public final class BlueMapHudPlugin extends JavaPlugin implements Listener {
             return;
         }
         HudSession session = hud.session(player);
-        hud.setFullscreen(player, session, !session.fullscreen());
+        boolean open = !session.fullscreen();
+        hud.setFullscreen(player, session, open);
+        if (open) explainIfNoMap(player);
+    }
+
+    /** Says why nothing appeared, because otherwise a missing map looks like a broken command. */
+    public void explainIfNoMap(Player player) {
+        if (hud.mapFor(player.getWorld()).isEmpty()) {
+            player.sendMessage(Component.text(BlueMapAPI.getInstance().isPresent()
+                    ? "BlueMap has no map for this world, so there's nothing to show here."
+                    : "BlueMap isn't ready yet, so there's no map to show.", NamedTextColor.YELLOW));
+        } else if (!packs.ready(player)) {
+            player.sendMessage(Component.text("Your client hasn't loaded the BlueMapHUD resource pack yet.", NamedTextColor.YELLOW));
+        }
     }
 
     /** Writes the player's view to a PNG, to compare with BlueMap's top-down view. */
@@ -172,12 +185,13 @@ public final class BlueMapHudPlugin extends JavaPlugin implements Listener {
                 config.tiles().refreshMinutes() * 60_000L, getLogger());
         MapComposer composer = new MapComposer(grid, config.hud().voidColor(), config.hud().colorStep());
         MarkerService markers = new MarkerService(config.markers());
-        hud.configure(config, new FrameBuilder(config, fonts, icons.advances(), composer, markers));
+        hud.configure(config, new FrameBuilder(config, fonts, icons.advances(), composer, markers), true);
         getLogger().info("Reading tiles from BlueMap " + api.getBlueMapVersion() + " using the " + config.tiles().source() + " source.");
     }
 
+    /** Without BlueMap there are no tiles or markers, but the test pattern still works. */
     private void stopRendering() {
-        hud.configure(config, null);
+        hud.configure(config, new FrameBuilder(config, fonts, icons.advances(), null, new MarkerService(config.markers())), false);
         if (grid != null) {
             grid.close();
             grid = null;
@@ -247,7 +261,7 @@ public final class BlueMapHudPlugin extends JavaPlugin implements Listener {
         }
         if (config.fullscreen().sneakSwapToggle() && config.fullscreen().enabled() && player.hasPermission("bluemaphud.fullscreen")) {
             event.setCancelled(true);
-            hud.setFullscreen(player, session, !session.fullscreen());
+            toggleFullscreen(player);
         }
     }
 }

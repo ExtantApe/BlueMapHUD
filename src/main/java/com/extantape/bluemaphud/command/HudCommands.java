@@ -60,8 +60,8 @@ public final class HudCommands {
         claimedMap = claim(commands, claimedMap != null ? List.of(claimedMap) : config.commands().mapNames(), "Open the fullscreen map", true, firstTime);
         claimedHud = claim(commands, claimedHud != null ? List.of(claimedHud) : config.commands().hudNames(), "Control the minimap", false, firstTime);
         // Namespaced names always exist, so a taken short name never locks anyone out.
-        commands.register(mapTree(Commands.literal("map")).build(), "Open the fullscreen map", List.of());
-        commands.register(hudTree(Commands.literal("hud")).build(), "Control the minimap", List.of());
+        addNamespaced(commands, "map", claimedMap, mapTree(Commands.literal("bluemaphud:map")));
+        addNamespaced(commands, "hud", claimedHud, hudTree(Commands.literal("bluemaphud:hud")));
         plugin.getLogger().info("Commands: fullscreen map is " + describe(claimedMap, "/bmhud map") + ", minimap is " + describe(claimedHud, "/bmhud hud") + ".");
     }
 
@@ -75,6 +75,15 @@ public final class HudCommands {
             if (registered.contains(name)) return name;
         }
         return null;
+    }
+
+    /**
+     * Adds the namespaced name directly. Registering "map" through {@link Commands#register} would also
+     * take the plain /map, even from a legacy command that another plugin owns.
+     */
+    private static void addNamespaced(Commands commands, String shortName, String claimed,
+                                      LiteralArgumentBuilder<CommandSourceStack> tree) {
+        if (!shortName.equals(claimed)) commands.getDispatcher().getRoot().addChild(tree.build());
     }
 
     private static String describe(String claimed, String fallback) {
@@ -173,6 +182,7 @@ public final class HudCommands {
         session.settings().enabled = enabled;
         plugin.hud().saveSettings(player, session);
         reply(player, enabled ? "Minimap on." : "Minimap off. It stays off until you turn it on.");
+        if (enabled) plugin.explainIfNoMap(player);
     }
 
     private static Integer parseZoom(String text, int current) {

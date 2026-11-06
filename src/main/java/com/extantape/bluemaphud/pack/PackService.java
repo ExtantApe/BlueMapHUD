@@ -13,6 +13,7 @@ import org.bukkit.plugin.Plugin;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.BindException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -86,6 +87,7 @@ public final class PackService {
 
     public void send(Player player) {
         if (!config.send() || pack == null) return;
+        if (config.publicUrl().isBlank() && serverPort < 0) return; // Hosting failed, and that's already logged.
         ResourcePackInfo info = ResourcePackInfo.resourcePackInfo(PACK_ID, packUri(player), pack.sha1Hex());
         ResourcePackRequest.Builder request = ResourcePackRequest.resourcePackRequest()
                 .packs(info)
@@ -137,7 +139,14 @@ public final class PackService {
     private void startServer(int port) throws IOException {
         if (server != null && serverPort == port) return;
         stopServer();
-        server = HttpServer.create(new InetSocketAddress(port), 16);
+        try {
+            server = HttpServer.create(new InetSocketAddress(port), 16);
+        } catch (BindException e) {
+            // Sending a dead URL would kick everyone when the pack is required, so send nothing instead.
+            plugin.getLogger().severe("Port " + port + " is already in use, so the resource pack can't be hosted and the map stays hidden."
+                    + " Set pack.port to a free port, or set pack.public-url.");
+            return;
+        }
         server.setExecutor(Executors.newFixedThreadPool(2, runnable -> {
             Thread thread = new Thread(runnable, "BlueMapHUD-pack");
             thread.setDaemon(true);

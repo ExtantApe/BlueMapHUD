@@ -2,15 +2,20 @@
 
 A lightweight Paper plugin that shows a [BlueMap](https://bluemap.bluecolored.de/)-sourced minimap and fullscreen map on the player's screen. It uses a small resource pack with its own namespace: no client mods, no shader overrides and no held map items.
 
-**Status:** pre-release. The build and tests pass, but it hasn't been run on a live server with a real client yet. See [Testing](#testing).
+**Status:** pre-release. It has run on live Paper servers with a protocol bot, but not yet with a real game client or rendered BlueMap tiles. See [Testing](#testing).
 
-- Requires Paper 1.21.11 or newer, and BlueMap 5.15 or newer. Java Edition only.
+- Requires Paper 1.21.11 or newer, and a BlueMap version that matches your server (see below). Java Edition only.
 - Works alongside other resource packs, because it never overrides a shader and only adds its own files.
+
+| Server | BlueMap | Java |
+| --- | --- | --- |
+| Paper 1.21.11 | 5.18 (5.19 and newer don't load on 1.21.11) | 25 (BlueMap 5.18 needs it) |
+| Paper 26.x | 5.20 or newer | 25 |
 
 ## Install
 
 1. Put `BlueMapHUD-<version>.jar` in `plugins/`, next to BlueMap.
-2. Open port `8164` so players can download the pack, or set `pack.public-url` to host it elsewhere.
+2. Open port `8164` so players can download the pack, or set `pack.public-url` to host it elsewhere. Servers sharing a machine each need their own `pack.port`.
 3. Start the server. Settings are in `plugins/BlueMapHUD/config.yml`.
 
 If BlueMap stores its maps in SQL, set `tiles.source: http`.
@@ -83,15 +88,30 @@ Real terrain has more colour variation than the test map, so expect larger updat
 
 `./gradlew build` compiles against the Paper 1.21.11 API and runs the tests. They include a simulated client that loads the generated pack and draws frames using the font rules read from the Minecraft 26.3 client: glyph advance, the `ascent <= height` check and text centring. It checks that every map cell lands on the right pixels and that no frame drifts.
 
-It's a simulation, so these still need a live check:
+It's a simulation, so the plugin has also been run on real servers, using a protocol bot as the client.
 
-- Clients 1.21.11, 26.1.2, 26.2 and 26.3, each on vanilla, Sodium, and Sodium + Iris with a shader pack.
+**Passed on Paper 1.21.11, with a bot:**
+
+- The pack is pushed as required, downloads with a matching hash, and uses the fixed pack ID.
+- Declining a required pack kicks with the custom message.
+- No boss bar is sent until the client reports the pack loaded.
+- All commands work, including the fallback and namespaced names. Non-ops can't use the admin commands.
+- When another plugin owns `/map` and `/hud`, it keeps them, and BlueMapHUD moves to `/worldmap` and `/minimap`.
+- Sneak + F toggles fullscreen. `/hud off` survives a rejoin.
+- A removed pack hides the map and is re-sent once, with no loop.
+- The boss bar arrives pink with zero progress. Test pattern frames captured off the wire resolve to real glyphs, have no shadow and net to zero advance. One 96x54 frame was drawn back to pixels and looked correct.
+
+**Passed on Paper 26.3, server side only:** the plugin loads, registers its commands and serves the pack. A busy pack port gives one clear error, and nothing is sent to players. The bot library has no 26.3 protocol support, so no player joined.
+
+**Not tested yet:**
+
+- Rendered BlueMap tiles, markers and player dots on a live server. These are only covered by the unit tests.
+- How it looks in a real game client, which the bot can't show. That includes the invisible boss bar, draw order of icons over the map, and clients 1.21.11, 26.1.2, 26.2 and 26.3, each on vanilla, Sodium, and Sodium + Iris with a shader pack.
 - GUI scales 2, 3, 4 and Auto, at widths 1280, 1920 and 2560.
 - ZigZag on the client, and sent by the server.
 - Magic's pack sent before and after ours, with a Magic spell or boss bar showing.
-- Accepting and declining a required pack, and a Bedrock join.
-- BlueMap on file storage and on SQL storage.
-- Command back-off when `/map` and `/hud` are already taken.
+- A Bedrock join, and BlueMap on SQL storage.
+- Back-off from another plugin's Brigadier commands. The live test used a legacy `plugin.yml` command.
 
 ## Building
 
@@ -99,7 +119,7 @@ It's a simulation, so these still need a live check:
 ./gradlew build
 ```
 
-The jar is written to `build/libs/`. Java 21 is needed to build it, and it also runs on the Java 25 servers that 26.x uses.
+The jar is written to `build/libs/`. Java 21 is needed to build it, and the jar runs on Java 21 and 25.
 
 ## License
 

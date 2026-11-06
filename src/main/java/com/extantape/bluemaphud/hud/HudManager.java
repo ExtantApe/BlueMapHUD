@@ -58,6 +58,7 @@ public final class HudManager {
 
     private HudConfig config;
     private FrameBuilder frames;
+    private volatile boolean rendering;
     private BukkitTask task;
     private int cycle;
     private final Map<UUID, Boolean> bossBarBlocked = new HashMap<>();
@@ -67,10 +68,15 @@ public final class HudManager {
         this.packs = packs;
     }
 
-    /** Starts or restarts the loop with new settings. Pass a null builder while BlueMap is unavailable. */
-    public void configure(HudConfig config, FrameBuilder frames) {
+    /**
+     * Starts or restarts the loop with new settings.
+     *
+     * @param rendering false while BlueMap is unavailable, when only the test pattern can be drawn
+     */
+    public void configure(HudConfig config, FrameBuilder frames, boolean rendering) {
         this.config = config;
         this.frames = frames;
+        this.rendering = rendering;
         worldMaps.clear();
         if (task != null) task.cancel();
         task = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 1L, config.hud().updateTicks());
@@ -139,6 +145,7 @@ public final class HudManager {
 
     /** The map a world's HUD draws: a configured override, or else its first map by ID. */
     public String mapFor(World world) {
+        if (!rendering) return "";
         return worldMaps.computeIfAbsent(world.getName(), name -> {
             String override = config.tiles().mapOverrides().get(name);
             if (override != null) return override;
@@ -166,7 +173,6 @@ public final class HudManager {
     private void tick() {
         cycle++;
         FrameBuilder builder = frames;
-        if (builder == null) return;
         boolean scanBosses = cycle % BOSS_SCAN_EVERY_CYCLES == 0 && config.hud().hideForOtherBossBar();
         Map<World, List<Boss>> worldBosses = scanBosses ? new HashMap<>() : null;
 
