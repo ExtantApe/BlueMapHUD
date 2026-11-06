@@ -141,11 +141,21 @@ final class SimulatedClient {
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
                 int sx = glyph.cellX + (int) (x / glyph.scale), sy = glyph.cellY + (int) (y / glyph.scale);
-                if (glyph.sheet.getRGB(sx, sy) >>> 24 == 0) continue;
+                int alpha = glyph.sheet.getRGB(sx, sy) >>> 24;
+                if (alpha < 26) continue; // The text shader discards anything under 0.1.
                 int px = left + x, py = top + y;
-                if (px >= 0 && py >= 0 && px < image.getWidth() && py < image.getHeight()) image.setRGB(px, py, 0xFF000000 | color);
+                if (px >= 0 && py >= 0 && px < image.getWidth() && py < image.getHeight()) image.setRGB(px, py, 0xFF000000 | mix(image.getRGB(px, py), color, alpha));
             }
         }
+    }
+
+    private static int mix(int under, int over, int alpha) {
+        int result = 0;
+        for (int shift = 0; shift <= 16; shift += 8) {
+            int a = under >> shift & 255, b = over >> shift & 255;
+            result |= (a + (b - a) * alpha / 255) << shift;
+        }
+        return result;
     }
 
     /** The uncompressed and zlib-compressed sizes of the component as it goes in a packet, approximating NBT. */

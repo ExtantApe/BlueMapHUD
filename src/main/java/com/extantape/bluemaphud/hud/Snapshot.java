@@ -7,7 +7,7 @@ package com.extantape.bluemaphud.hud;
  * @param death        the viewer's last death position on this map as {x, z}, or null
  */
 public record Snapshot(
-        String mapId, int blockX, int blockZ, float yaw, boolean fullscreen,
+        String mapId, int blockX, int blockY, int blockZ, float yaw, boolean fullscreen,
         int zoom, int size, int offsetX, int offsetY,
         boolean showCoords, boolean showMarkers,
         int[] otherPlayers, int[] death, boolean pattern

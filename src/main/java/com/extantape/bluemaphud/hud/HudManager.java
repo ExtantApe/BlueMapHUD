@@ -231,7 +231,7 @@ public final class HudManager {
         if (config.markers().showDeath() && lastDeath != null && lastDeath.getWorld() == player.getWorld()) {
             death = new int[] {lastDeath.getBlockX(), lastDeath.getBlockZ()};
         }
-        return new Snapshot(mapId, location.getBlockX(), location.getBlockZ(), location.getYaw(), full,
+        return new Snapshot(mapId, location.getBlockX(), location.getBlockY(), location.getBlockZ(), location.getYaw(), full,
                 full ? settings.fullscreenZoom : settings.zoom, settings.size, settings.offsetX, settings.offsetY,
                 settings.showCoords, settings.showMarkers, visiblePlayers(player, session, location), death, session.pattern);
     }

@@ -4,8 +4,10 @@ import com.extantape.bluemaphud.config.HudConfig;
 
 /** The fonts a given config needs. The pack is generated from the same object that draws the map. */
 public final class HudFonts {
-    /** Pixels kept free below the largest grid for the coordinate line. */
-    private static final int TEXT_PIXELS = 7;
+    /** Pixels between the bottom of the map and the top of the coordinate line's plate. */
+    private static final int READOUT_GAP = 2;
+    /** Pixels kept free below the largest grid for the coordinate line and its plate. */
+    private static final int TEXT_PIXELS = READOUT_GAP + FontLayout.PLATE_HEIGHT + 1;
     private static final int MAX_MINIMAP_CELLS = 40;
     /** The client's font atlas can't hold a glyph taller than this. */
     private static final int MAX_CELL_PIXELS = 240;
@@ -38,5 +40,11 @@ public final class HudFonts {
 
     private static int reservedRows(int cell) {
         return Math.max(2, TEXT_PIXELS / cell + 1);
+    }
+
+    /** How many rows below the map the coordinate line starts, leaving room for its plate. */
+    public static int readoutRowOffset(FontLayout layout) {
+        int above = READOUT_GAP + FontLayout.PLATE_MARGIN;
+        return (above + layout.step() - 1) / layout.step();
     }
 }

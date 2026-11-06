@@ -31,7 +31,7 @@ If BlueMap stores its maps in SQL, set `tiles.source: http`.
 | `/hud size small\|medium\|large` | Sets the size to 24, 32 or 40 cells. |
 | `/hud offset <x> <y>` | Moves the minimap, in GUI pixels from top centre. |
 | `/hud corner left\|right\|center` | Moves it to a rough preset position. |
-| `/hud hide\|show coords\|players\|markers` | Toggles one part of the map. |
+| `/hud hide\|show coords\|players\|markers` | Toggles one part of the map. Coordinates show X, Y, Z and facing. |
 | `/bmhud help` | Shows help. |
 | `/bmhud reload` | Reloads the config, and re-sends the pack if it changed. |
 | `/bmhud debug` | Shows cache sizes, build times and update sizes. |
@@ -64,6 +64,7 @@ The plugin sends its pack alongside any others using the multi-pack API, and pla
 
 - **Screen position:** the server can't see a player's screen size, so the map starts at top centre. Players can move it with `/hud offset` or `/hud corner`.
 - **Other boss bars:** the minimap hides for Adventure boss bars, registered Bukkit bars and the Wither and Ender Dragon. A bar made with Bukkit's unregistered `createBossBar` can't be detected, so the minimap stays up and the two share the screen.
+- **Coordinates:** the coordinate line is part of the minimap, so it hides whenever the minimap does, including during boss fights and with `/hud off`. The fullscreen map always shows it.
 - **Vertical position:** `/hud offset y` moves in whole map cells, up to `hud.max-offset-y`.
 - **Action bar mode:** the map sits above the hotbar and can flicker if another plugin also uses the action bar. The fullscreen map still uses a boss bar.
 - **Other pink boss bars:** the pack makes one boss bar colour transparent, so another plugin's bar in that colour disappears too. Choose a colour with `pack.boss-bar-color` that nothing else uses.
@@ -95,7 +96,8 @@ The plugin has also been tested on live servers: Paper 1.21.11 with BlueMap 5.18
 **Passed on both servers:**
 
 - **Map accuracy:** every zoom level, every size, all three dimensions, negative coordinates, unrendered areas and the fullscreen map. Re-rendered tiles reach the HUD within the refresh time.
-- **Icons and text:** heading arrows at all 8 compass points, player dots, POI markers and labels (including accents, CJK and very long labels), edge arrows, the death point and coordinates.
+- **Icons and text:** the X, Y, Z and facing readout, heading arrows at all 8 compass points, player dots, POI markers and labels (including accents, CJK and very long labels), edge arrows, the death point and coordinates.
+- **One boss bar:** the map and coordinates share a single bar. A second never appeared through every `/hud` option, fullscreen, sneak + F, reloads, pack re-sends, auto-hide and a full `/reload`.
 - **Hiding:** vanish, `hidePlayer`, spectators, invisibility, players hidden in BlueMap, the radius, other dimensions, permissions, other boss bars, the Wither, the Ender Dragon and every `auto-hide` setting.
 - **Updates:** nothing is sent while idle, and at most 4 updates a second otherwise.
 - **Pack handling:** required, optional, declined and failed downloads, `host`, `public-url`, `send: false`, bar colours, custom icons, and another plugin wiping packs with the old one-pack method.
@@ -106,16 +108,16 @@ The plugin has also been tested on live servers: Paper 1.21.11 with BlueMap 5.18
 **Also passed:**
 
 - **SQL storage:** on 1.21.11, tiles held in SQLite through the HTTP source matched the same world rendered to files on all 1024 cells.
-- **Game code:** the Minecraft 26.1.2, 26.2 and 26.3 client code loads the generated pack and fonts, with the game's advances matching this project's for all 9,886 glyphs. The 1.21.11 client's bytecode uses the same glyph advance formula.
+- **Game code:** the Minecraft 26.1.2, 26.2 and 26.3 client code loads the generated pack and fonts, with the game's advances matching this project's for all 13,527 glyphs. The 1.21.11 client's bytecode uses the same glyph advance formula.
 
 **20 moving players, one minute, on real terrain:**
 
 | | Paper 1.21.11 | Paper 26.3 | Budget |
 | --- | --- | --- | --- |
-| Average frame build | 80 µs | 73 µs | 1 ms |
+| Average frame build | 55 µs | 45 µs | 1 ms |
 | Update size, compressed (95th percentile) | 2.3 KB | 2.3 KB | 5 KB |
-| Largest update, compressed | 2.6 KB | 2.5 KB | none |
-| Server tick | 7.8 ms | 8.0 ms | 50 ms |
+| Largest update, compressed | 2.6 KB | 2.6 KB | none |
+| Server tick | 6.5 ms | 6.1 ms | 50 ms |
 
 **Not tested yet:**
 

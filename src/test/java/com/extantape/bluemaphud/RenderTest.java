@@ -148,7 +148,8 @@ class RenderTest {
                         for (int x = 0; x < size; x++) grid[z * size + x] = terrain(x, z);
                     }
                     int offsetX = cellPixels == 2 ? 37 : 0;
-                    int offsetRows = Math.min(3, fonts.maxOffsetRows);
+                    // The tallest maps nearly fill a small screen, so only offset ones that have room.
+                    int offsetRows = size * cellPixels <= 128 ? Math.min(3, fonts.maxOffsetRows) : 0;
                     MapFrame frame = new MapFrame(layout, advances(), size, size, offsetX, offsetRows);
                     frame.drawGrid(grid);
                     Component component = frame.finish();
@@ -257,6 +258,49 @@ class RenderTest {
     }
 
     @Test
+    void readoutShowsXyzAndFacingOnAPlateUnderTheMap() throws IOException {
+        HudConfig config = config();
+        HudFonts fonts = new HudFonts(config);
+        SimulatedClient client = client(config, fonts);
+        try (GridCache cache = new GridCache(new TileStore(new SolidSource()), 64, 600_000, Logger.getAnonymousLogger())) {
+            FrameBuilder builder = new FrameBuilder(config, fonts, advances(),
+                    new MapComposer(cache, config.hud().voidColor(), config.hud().colorStep()), new MarkerService(config.markers()));
+            Snapshot with = new Snapshot("world", -1234, -60, 5678, 180f, false, 2, 32, 0, 0, true, false, new int[0], null, false);
+            Component frame = builder.build(with, new int[32 * 32]).component();
+            assertEquals(0, client.totalAdvance(frame), "Plates and readout must leave the frame centred");
+
+            BufferedImage image = new BufferedImage(SCREEN_W, SCREEN_H, BufferedImage.TYPE_INT_ARGB);
+            for (int y = 0; y < SCREEN_H; y++) {
+                for (int x = 0; x < SCREEN_W; x++) image.setRGB(x, y, 0xFFECF0F5);
+            }
+            client.draw(frame, image, BOSS_TEXT_Y);
+            int plateY = BOSS_TEXT_Y + fonts.minimap.rowTop(32 + HudFonts.readoutRowOffset(fonts.minimap)) - 1;
+            assertEquals(0xFF76787B, image.getRGB(SCREEN_W / 2, plateY), "Half-dark plate over snow");
+            int mapBottom = BOSS_TEXT_Y + fonts.minimap.rowTop(32);
+            assertEquals(0xFFECF0F5, image.getRGB(SCREEN_W / 2, mapBottom), "A gap between the map and the plate");
+
+            Snapshot without = new Snapshot("world", -1234, -60, 5678, 180f, false, 2, 32, 0, 0, false, false, new int[0], null, false);
+            int plain = client.totalAdvance(builder.build(without, new int[32 * 32]).component());
+            assertEquals(0, plain);
+
+            Snapshot higher = new Snapshot("world", -1234, -59, 5678, 180f, false, 2, 32, 0, 0, true, false, new int[0], null, false);
+            assertNotEquals(builder.stateKey(with), builder.stateKey(higher), "Climbing changes the readout");
+            Snapshot higherHidden = new Snapshot("world", -1234, -59, 5678, 180f, false, 2, 32, 0, 0, false, false, new int[0], null, false);
+            assertEquals(builder.stateKey(without), builder.stateKey(higherHidden), "With coordinates hidden, climbing sends nothing");
+        }
+    }
+
+    @Test
+    void readoutFontAdvancesMatchTheClientFormula() throws IOException {
+        HudConfig config = config();
+        HudFonts fonts = new HudFonts(config);
+        SimulatedClient.Font font = client(config, fonts).fonts.get("hud");
+        for (int glyph = 0; glyph < com.extantape.bluemaphud.render.ReadoutFont.glyphCount(); glyph++) {
+            assertEquals(font.glyphs().get(fonts.minimap.readoutChar(0, glyph)).advance(), com.extantape.bluemaphud.render.ReadoutFont.advance(glyph), "glyph " + glyph);
+        }
+    }
+
+    @Test
     void tinyFontAdvancesMatchTheClientFormula() throws IOException {
         HudConfig config = config();
         HudFonts fonts = new HudFonts(config);
@@ -284,7 +328,7 @@ class RenderTest {
     }
 
     private static Snapshot snap(int x, int z, float yaw, int[] others) {
-        return new Snapshot("world", x, z, yaw, false, 2, 32, 0, 0, true, false, others, null, false);
+        return new Snapshot("world", x, 70, z, yaw, false, 2, 32, 0, 0, true, false, others, null, false);
     }
 
     @Test
@@ -307,8 +351,8 @@ class RenderTest {
             assertNotEquals(base, builder.stateKey(snap(10, 10, 0f, new int[] {20, 20})), "Another player");
 
             // Without coordinates, moving inside one cell draws the same picture.
-            Snapshot a = new Snapshot("world", 10, 10, 0f, false, 2, 32, 0, 0, false, false, new int[0], null, false);
-            Snapshot b = new Snapshot("world", 11, 11, 0f, false, 2, 32, 0, 0, false, false, new int[0], null, false);
+            Snapshot a = new Snapshot("world", 10, 70, 10, 0f, false, 2, 32, 0, 0, false, false, new int[0], null, false);
+            Snapshot b = new Snapshot("world", 11, 70, 11, 0f, false, 2, 32, 0, 0, false, false, new int[0], null, false);
             assertEquals(builder.stateKey(a), builder.stateKey(b));
         }
     }
@@ -332,13 +376,15 @@ class RenderTest {
 
             int[] others = {30, 12, -24, 40, 8, -50};
             int[] grid = new int[config.fullscreen().width() * config.fullscreen().height()];
-            Snapshot mini = new Snapshot("world", 4, 4, -135f, false, 2, 32, 0, 0, true, false, others, new int[] {-20, -20}, false);
+            Snapshot mini = new Snapshot("world", 4, 70, 4, -135f, false, 2, 32, 0, 0, true, false, others, new int[] {-20, -20}, false);
             preview(client, builder.build(mini, grid).component(), new File(folder, "minimap.png"));
+            previewOn(client, builder.build(mini, grid).component(), new File(folder, "minimap-snow.png"), 0xFFECF0F5);
 
-            Snapshot full = new Snapshot("world", 4, 4, -135f, true, 8, 32, 0, 0, true, false, others, new int[] {-20, -20}, false);
+            Snapshot full = new Snapshot("world", 4, 70, 4, -135f, true, 8, 32, 0, 0, true, false, others, new int[] {-20, -20}, false);
             preview(client, builder.build(full, grid).component(), new File(folder, "fullscreen.png"));
+            previewOn(client, builder.build(full, grid).component(), new File(folder, "fullscreen-snow.png"), 0xFFECF0F5);
 
-            Snapshot pattern = new Snapshot("world", 4, 4, 180f, false, 2, 32, 0, 0, true, false, new int[0], null, true);
+            Snapshot pattern = new Snapshot("world", 4, 70, 4, 180f, false, 2, 32, 0, 0, true, false, new int[0], null, true);
             preview(client, builder.build(pattern, grid).component(), new File(folder, "pattern.png"));
 
             // Warm up, then time the real work on one background thread.
@@ -353,9 +399,13 @@ class RenderTest {
     }
 
     private static void preview(SimulatedClient client, Component component, File file) throws IOException {
+        previewOn(client, component, file, 0xFF6A8CAF);
+    }
+
+    private static void previewOn(SimulatedClient client, Component component, File file, int background) throws IOException {
         BufferedImage image = new BufferedImage(SCREEN_W, SCREEN_H, BufferedImage.TYPE_INT_ARGB);
         for (int y = 0; y < SCREEN_H; y++) {
-            for (int x = 0; x < SCREEN_W; x++) image.setRGB(x, y, 0xFF6A8CAF);
+            for (int x = 0; x < SCREEN_W; x++) image.setRGB(x, y, background);
         }
         client.draw(component, image, BOSS_TEXT_Y);
         BufferedImage scaled = new BufferedImage(SCREEN_W * 2, SCREEN_H * 2, BufferedImage.TYPE_INT_ARGB);

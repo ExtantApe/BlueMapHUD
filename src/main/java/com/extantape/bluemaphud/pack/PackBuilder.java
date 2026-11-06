@@ -5,6 +5,7 @@ import com.extantape.bluemaphud.render.FontLayout;
 import com.extantape.bluemaphud.render.HudFonts;
 import com.extantape.bluemaphud.render.HudIcon;
 import com.extantape.bluemaphud.render.IconSet;
+import com.extantape.bluemaphud.render.ReadoutFont;
 import com.extantape.bluemaphud.render.TinyFont;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -35,6 +36,8 @@ public final class PackBuilder {
     private static final int SHEET_COLUMNS = 16;
     private static final long FIXED_ZIP_TIME = 1_000_000_000_000L;
     private static final int RUN_CELL_WIDTH = FontLayout.MAX_RUN;
+    /** The plate behind text: about half transparent, tinted black by the frame. */
+    private static final int PLATE_PIXEL = 0x80FFFFFF;
     private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().create();
 
     public record Built(byte[] zip, String sha1Hex, byte[] sha1) {}
@@ -76,6 +79,10 @@ public final class PackBuilder {
         files.put("assets/bluemaphud/textures/font/" + name + "_runs.png", png(runSheet(runCells)));
         files.put("assets/bluemaphud/textures/font/" + name + "_icons.png", png(iconSheet(icons, iconCells)));
         files.put("assets/bluemaphud/textures/font/" + name + "_text.png", png(textSheet(textCells)));
+        int readoutCells = FontLayout.paddedCells(layout.maxReadoutAscent(), 1, ReadoutFont.HEIGHT);
+        int plateCells = FontLayout.paddedCells(layout.maxPlateAscent(), 1, FontLayout.PLATE_HEIGHT);
+        files.put("assets/bluemaphud/textures/font/" + name + "_readout.png", png(readoutSheet(readoutCells)));
+        files.put("assets/bluemaphud/textures/font/" + name + "_plate.png", png(plateSheet(plateCells)));
 
         JsonArray providers = new JsonArray();
         providers.add(spaceProvider());
@@ -89,6 +96,11 @@ public final class PackBuilder {
                     sheetRows(HudIcon.COUNT, i -> layout.iconChar(r, i))));
             providers.add(bitmap(name + "_text", textCells, layout.textAscent(row),
                     sheetRows(TinyFont.glyphCount(), i -> layout.textChar(r, i))));
+            providers.add(bitmap(name + "_readout", readoutCells, layout.readoutAscent(row),
+                    sheetRows(ReadoutFont.glyphCount(), i -> layout.readoutChar(r, i))));
+            String[] plates = new String[FontLayout.PLATE_LENGTHS];
+            for (int i = 0; i < plates.length; i++) plates[i] = new String(Character.toChars(layout.plateChar(row, i)));
+            providers.add(bitmap(name + "_plate", plateCells, layout.plateAscent(row), plates));
         }
         JsonObject font = new JsonObject();
         font.add("providers", providers);
@@ -170,6 +182,33 @@ public final class PackBuilder {
                 for (int x = 0; x < TinyFont.WIDTH; x++) {
                     if (TinyFont.pixel(glyph, x, y)) image.setRGB(originX + x, originY + y, 0xFFFFFFFF);
                 }
+            }
+        }
+        return image;
+    }
+
+    private static BufferedImage readoutSheet(int cellHeight) {
+        int count = ReadoutFont.glyphCount();
+        int rows = (count + SHEET_COLUMNS - 1) / SHEET_COLUMNS;
+        BufferedImage image = new BufferedImage(ReadoutFont.WIDTH * SHEET_COLUMNS, cellHeight * rows, BufferedImage.TYPE_INT_ARGB);
+        for (int glyph = 0; glyph < count; glyph++) {
+            int originX = glyph % SHEET_COLUMNS * ReadoutFont.WIDTH;
+            int originY = glyph / SHEET_COLUMNS * cellHeight;
+            for (int y = 0; y < ReadoutFont.HEIGHT; y++) {
+                for (int x = 0; x < ReadoutFont.WIDTH; x++) {
+                    if (ReadoutFont.pixel(glyph, x, y)) image.setRGB(originX + x, originY + y, 0xFFFFFFFF);
+                }
+            }
+        }
+        return image;
+    }
+
+    /** One column of cells. Row {@code i} is a plate {@code 2^i} pixels wide, with padding below. */
+    private static BufferedImage plateSheet(int cellHeight) {
+        BufferedImage image = new BufferedImage(1 << (FontLayout.PLATE_LENGTHS - 1), cellHeight * FontLayout.PLATE_LENGTHS, BufferedImage.TYPE_INT_ARGB);
+        for (int i = 0; i < FontLayout.PLATE_LENGTHS; i++) {
+            for (int y = 0; y < FontLayout.PLATE_HEIGHT; y++) {
+                for (int x = 0; x < 1 << i; x++) image.setRGB(x, i * cellHeight + y, PLATE_PIXEL);
             }
         }
         return image;

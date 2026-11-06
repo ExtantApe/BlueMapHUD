@@ -7,6 +7,7 @@ import com.extantape.bluemaphud.render.HudFonts;
 import com.extantape.bluemaphud.render.HudIcon;
 import com.extantape.bluemaphud.render.MapComposer;
 import com.extantape.bluemaphud.render.MapFrame;
+import com.extantape.bluemaphud.render.ReadoutFont;
 import com.extantape.bluemaphud.render.TinyFont;
 import net.kyori.adventure.text.Component;
 
@@ -21,7 +22,9 @@ public final class FrameBuilder {
     private static final int COLOR_POI = 0xFFC845;
     private static final int COLOR_DEATH = 0xFF5B5B;
     private static final int COLOR_TEXT = 0xFFFFFF;
-    private static final int COLOR_DIM = 0xA8B0BC;
+    private static final int COLOR_DIM = 0xBEC6D2;
+    /** Pixels between a plate's edge and its text. */
+    private static final int PLATE_PADDING = 3;
     private static final String[] COMPASS = {"N", "NE", "E", "SE", "S", "SW", "W", "NW"};
 
     private final HudConfig config;
@@ -58,7 +61,7 @@ public final class FrameBuilder {
         key = key * 31 + HudIcon.headingForYaw(s.yaw());
         key = key * 31 + s.offsetX();
         key = key * 31 + s.offsetY();
-        key = key * 31 + (s.showCoords() ? s.blockX() * 31L + s.blockZ() : 0);
+        key = key * 31 + (s.showCoords() || s.fullscreen() ? (s.blockX() * 31L + s.blockY()) * 31L + s.blockZ() : 0);
         key = key * 31 + (s.showMarkers() ? 1 : 0);
         for (int i = 0; i < s.otherPlayers().length; i++) {
             key = key * 31 + Math.floorDiv(s.otherPlayers()[i], bpc);
@@ -112,13 +115,9 @@ public final class FrameBuilder {
 
         frame.drawIcon(HudIcon.headingForYaw(s.yaw()), width / 2, height / 2, COLOR_SELF);
 
-        int textRow = height + 1;
-        if (full) {
-            drawLegend(frame, s, width, layout, others.length / 2, count, textRow);
-        } else if (s.showCoords()) {
-            String line = s.blockX() + " " + s.blockZ() + " " + compass(s.yaw());
-            frame.drawText(line, (width * layout.step() - TinyFont.width(line)) / 2, textRow, COLOR_TEXT);
-        }
+        int textRow = height + HudFonts.readoutRowOffset(layout);
+        if (full || s.showCoords()) drawReadout(frame, s, width * layout.step(), textRow);
+        if (full) drawLegend(frame, s, width * layout.step(), others.length / 2, count, textRow);
         return new Built(frame.finish(), frame.estimatedBytes());
     }
 
@@ -142,10 +141,26 @@ public final class FrameBuilder {
         return 1;
     }
 
-    private void drawLegend(MapFrame frame, Snapshot s, int width, FontLayout layout, int players, int markerCount, int textRow) {
-        String line = s.blockX() + " " + s.blockZ() + "   " + compass(s.yaw()) + "   1:" + s.zoom()
-                + "   PLAYERS " + players + "   MARKERS " + markerCount;
-        frame.drawText(line, (width * layout.step() - TinyFont.width(line)) / 2, textRow, COLOR_DIM);
+    /** Draws "X Y Z facing", centred under the map on a plate. */
+    private void drawReadout(MapFrame frame, Snapshot s, int mapWidth, int textRow) {
+        String position = s.blockX() + " " + s.blockY() + " " + s.blockZ() + " ";
+        String facing = compass(s.yaw());
+        int width = ReadoutFont.width(position + facing);
+        int x = (mapWidth - width) / 2;
+        frame.drawPlate(x - PLATE_PADDING, width - 1 + PLATE_PADDING * 2, textRow);
+        int end = frame.drawReadout(position, x, textRow, COLOR_TEXT);
+        frame.drawReadout(facing, end, textRow, COLOR_DIM);
+    }
+
+    /** Draws the zoom at the left of the map, and the counts at the right, on plates of their own. */
+    private void drawLegend(MapFrame frame, Snapshot s, int mapWidth, int players, int markerCount, int textRow) {
+        String zoom = "1:" + s.zoom();
+        String counts = "PLAYERS " + players + "  MARKERS " + markerCount;
+        frame.drawPlate(0, TinyFont.width(zoom) - 1 + PLATE_PADDING * 2, textRow);
+        frame.drawText(zoom, PLATE_PADDING, textRow, COLOR_DIM);
+        int countsWidth = TinyFont.width(counts) - 1 + PLATE_PADDING * 2;
+        frame.drawPlate(mapWidth - countsWidth, countsWidth, textRow);
+        frame.drawText(counts, mapWidth - countsWidth + PLATE_PADDING, textRow, COLOR_DIM);
     }
 
     private static String compass(float yaw) {

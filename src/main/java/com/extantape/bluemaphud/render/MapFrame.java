@@ -92,6 +92,42 @@ public final class MapFrame {
         }
     }
 
+    /**
+     * Draws a dark translucent plate, so that text stays readable over bright worlds. Call it before the
+     * text it sits behind. The width is rounded to a whole number of plate glyphs.
+     */
+    public void drawPlate(int pixelX, int width, int gridRow) {
+        int row = Math.min(layout.rows() - 1, layout.rowFor(gridRow, height, offsetRows));
+        moveTo(left + pixelX);
+        setColor(0);
+        for (int remaining = width; remaining > 0; ) {
+            int index = FontLayout.PLATE_LENGTHS - 1;
+            while ((1 << index) > remaining) index--;
+            pending.appendCodePoint(layout.plateChar(row, index));
+            pending.appendCodePoint(FontLayout.spaceChar(true, 0));
+            remaining -= 1 << index;
+            cursor += 1 << index;
+        }
+    }
+
+    /** Draws readout text, and returns the pixel after it. Only characters in {@link ReadoutFont} are allowed. */
+    public int drawReadout(String text, int pixelX, int gridRow, int color) {
+        int row = Math.min(layout.rows() - 1, layout.rowFor(gridRow, height, offsetRows));
+        moveTo(left + pixelX);
+        setColor(color);
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == ' ') {
+                appendMove(ReadoutFont.SPACE_ADVANCE);
+            } else {
+                int glyph = ReadoutFont.index(c);
+                pending.appendCodePoint(layout.readoutChar(row, glyph));
+                cursor += ReadoutFont.advance(glyph);
+            }
+        }
+        return cursor - left;
+    }
+
     /** Finishes the frame back at the start so its total advance is zero. */
     public Component finish() {
         moveTo(0);
