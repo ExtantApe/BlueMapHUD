@@ -52,8 +52,7 @@ public final class HudCommands {
                             reply(p, s.settings().enabled ? "Test pattern toggled." : "Test pattern toggled. Turn the HUD on to see it.");
                         }))))
                 .then(Commands.literal("pack").requires(HudCommands::isAdmin)
-                        .then(Commands.literal("export").executes(ctx ->
-                                reply(ctx.getSource().getSender(), "The pack is at " + plugin.packs().exportPath()))));
+                        .then(Commands.literal("export").executes(ctx -> exportPack(ctx.getSource().getSender()))));
         commands.register(admin.build(), "BlueMapHUD help and admin commands", List.of());
 
         boolean firstTime = claimedMap == null && claimedHud == null;
@@ -232,6 +231,15 @@ public final class HudCommands {
             sender.sendMessage(Component.text("Admin: /bmhud reload, debug, debug dump, debug pattern, pack export."));
             sender.sendMessage(Component.text(hud.debugLine()));
         }
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int exportPack(CommandSender sender) {
+        var packs = plugin.packs();
+        reply(sender, "The pack is at " + packs.exportPath() + ", SHA-1 " + packs.sha1() + ".");
+        reply(sender, "To host it at pack.public-url, upload that zip unchanged: re-zipping it changes the hash, and clients reject a pack whose hash doesn't match.");
+        String url = packs.publicUrl();
+        if (url != null) reply(sender, "Players are sent " + url + " (check: " + packs.publicUrlStatus() + ").");
         return Command.SINGLE_SUCCESS;
     }
 

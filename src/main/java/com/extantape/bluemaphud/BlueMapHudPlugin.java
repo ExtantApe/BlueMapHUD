@@ -105,7 +105,7 @@ public final class BlueMapHudPlugin extends JavaPlugin implements Listener {
 
     public String debugLine() {
         String tiles = grid == null ? "BlueMap unavailable" : grid.cachedChunks() + " chunks and " + grid.cachedTiles() + " tiles cached";
-        return tiles + "; " + hud.debugLine() + "; pack " + packs.sha1();
+        return tiles + "; " + hud.debugLine() + "; pack " + packs.sha1() + ", public-url " + packs.publicUrlStatus();
     }
 
     public void toggleFullscreen(Player player) {

@@ -37,7 +37,7 @@ If BlueMap stores its maps in SQL, set `tiles.source: http`.
 | `/bmhud debug` | Shows cache sizes, build times and update sizes. |
 | `/bmhud debug dump` | Writes your view to a PNG to compare with BlueMap. |
 | `/bmhud debug pattern` | Shows a test pattern. |
-| `/bmhud pack export` | Shows where the pack zip is, for merging. |
+| `/bmhud pack export` | Shows where the pack zip is, its SHA-1, and the address players are sent. |
 
 If another plugin owns a name, BlueMapHUD backs off: `/map` to `/worldmap`, then `/bmhud map`, and `/hud` to `/minimap`, then `/bmhud hud`. It logs which names it got. `/bmhud map`, `/bmhud hud`, `/bluemaphud:map` and `/bluemaphud:hud` always work. New names apply after a restart.
 
@@ -55,6 +55,8 @@ If another plugin owns a name, BlueMapHUD backs off: `/map` to `/worldmap`, then
 The plugin sends its pack alongside any others using the multi-pack API, and players don't see a map until their client confirms it loaded. Its only file outside its own namespace is a transparent boss bar texture, in pink by default. If another pack restyles that colour, set `pack.boss-bar-color` to one it leaves alone.
 
 **Using it with Magic.** Magic sends its pack with Bukkit's older one-pack method, which clears every other server pack. BlueMapHUD re-sends its pack once when that happens, but it's better to stop the conflict. In `plugins/Magic/config.yml` set `resource_pack: ""`, then add Magic's pack to your main pack.
+
+**Hosting it elsewhere.** Set `pack.public-url` to where you upload `plugins/BlueMapHUD/pack/bluemaphud-pack.zip`. Upload it unchanged, because re-zipping changes its SHA-1 and clients reject a pack whose hash doesn't match. `{sha1}` in the address is replaced with the pack's hash, such as `https://example.com/packs/{sha1}.zip`, so the address changes whenever the pack does. The same settings and plugin version always build the same hash. On startup and `/bmhud reload` the plugin downloads the address once in the background and warns, with both hashes, if it isn't the current pack. It never blocks startup. If the server can't reach the address but players can, set `pack.verify-public-url: false`. `/bmhud pack export` shows the path, the hash and the address players are sent.
 
 **Using a merged pack.** Set `pack.send: false`, run `/bmhud pack export`, and merge that zip into your server's pack. On startup the plugin warns if its files are missing.
 
@@ -100,7 +102,7 @@ The plugin has also been tested on live servers: Paper 1.21.11 with BlueMap 5.18
 - **One boss bar:** the map and coordinates share a single bar. A second never appeared through every `/hud` option, fullscreen, sneak + F, reloads, pack re-sends, auto-hide and a full `/reload`.
 - **Hiding:** vanish, `hidePlayer`, spectators, invisibility, players hidden in BlueMap, the radius, other dimensions, permissions, other boss bars, the Wither, the Ender Dragon and every `auto-hide` setting.
 - **Updates:** nothing is sent while idle, and at most 4 updates a second otherwise.
-- **Pack handling:** required, optional, declined and failed downloads, `host`, `public-url`, `send: false`, bar colours, custom icons, and another plugin wiping packs with the old one-pack method.
+- **Pack handling:** required, optional, declined and failed downloads, `host`, `public-url` with and without `{sha1}`, the hosted-pack check (matching, stale, missing, unreachable, never answering, invalid and turned off), `send: false`, bar colours, custom icons, and another plugin wiping packs with the old one-pack method.
 - **Life cycle:** `/bmhud reload`, `/bluemap reload`, a full `/reload`, server restarts, saved settings and quick join/quits.
 - **Bad data:** corrupt tiles, a wrong web root, an unreachable webserver and the far edge of the world.
 - **Other setups:** the action bar channel, the HTTP source, and command back-off from another plugin's `plugin.yml` commands.

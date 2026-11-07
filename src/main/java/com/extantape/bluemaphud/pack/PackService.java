@@ -41,11 +41,12 @@ public final class PackService {
     private final Set<UUID> loaded = ConcurrentHashMap.newKeySet();
     private final Set<UUID> resent = ConcurrentHashMap.newKeySet();
     private HudConfig.Pack config;
-    private PackBuilder.Built pack;
+    private volatile PackBuilder.Built pack;
     private HttpServer server;
     private int serverPort = -1;
     private volatile String servedPath = "";
     private volatile byte[] servedBytes = new byte[0];
+    private volatile String publicUrlStatus = "not checked";
 
     public PackService(Plugin plugin, Path packFolder) {
         this.plugin = plugin;
@@ -64,7 +65,20 @@ public final class PackService {
         if (config.send() && config.publicUrl().isBlank()) startServer(config.port());
         else stopServer();
         if (!config.send()) checkMergedPackAsync();
+        else if (!config.publicUrl().isBlank()) checkPublicUrlAsync();
+        else publicUrlStatus = "not used";
         return changed;
+    }
+
+    /** Where players download the pack from, or null when it's hosted by the built-in server. */
+    public String publicUrl() {
+        if (config == null || config.publicUrl().isBlank() || pack == null) return null;
+        return PublicUrlCheck.fill(config.publicUrl(), pack.sha1Hex());
+    }
+
+    /** The last public-url check's result, for /bmhud debug. */
+    public String publicUrlStatus() {
+        return publicUrlStatus;
     }
 
     public Path exportPath() {
@@ -88,6 +102,7 @@ public final class PackService {
     public void send(Player player) {
         if (!config.send() || pack == null) return;
         if (config.publicUrl().isBlank() && serverPort < 0) return; // Hosting failed, and that's already logged.
+        if ("invalid address".equals(publicUrlStatus)) return; // Already logged; a bad URI would throw on every join.
         ResourcePackInfo info = ResourcePackInfo.resourcePackInfo(PACK_ID, packUri(player), pack.sha1Hex());
         ResourcePackRequest.Builder request = ResourcePackRequest.resourcePackRequest()
                 .packs(info)
@@ -128,7 +143,8 @@ public final class PackService {
     }
 
     private URI packUri(Player player) {
-        if (!config.publicUrl().isBlank()) return URI.create(config.publicUrl());
+        String publicUrl = publicUrl();
+        if (publicUrl != null) return URI.create(publicUrl);
         String host = config.host();
         if (host.isBlank() && player.getVirtualHost() != null) host = player.getVirtualHost().getHostString();
         if (host == null || host.isBlank()) host = Bukkit.getIp();
@@ -177,6 +193,37 @@ public final class PackService {
             server = null;
             serverPort = -1;
         }
+    }
+
+    /**
+     * Downloads public-url once and warns if it isn't the pack just built, because the client would reject
+     * it. Warns only: the address may be reachable by players but not by this server.
+     */
+    private void checkPublicUrlAsync() {
+        String url = publicUrl();
+        String expected = pack.sha1Hex();
+        try {
+            URI uri = URI.create(url);
+            if (uri.getScheme() == null || !uri.getScheme().toLowerCase(java.util.Locale.ROOT).matches("https?")) {
+                throw new IllegalArgumentException();
+            }
+        } catch (IllegalArgumentException e) {
+            publicUrlStatus = "invalid address";
+            plugin.getLogger().warning("pack.public-url isn't a valid http or https address: " + url);
+            return;
+        }
+        if (!config.verifyPublicUrl()) {
+            publicUrlStatus = "check turned off";
+            return;
+        }
+        publicUrlStatus = "checking";
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            PublicUrlCheck.Result result = PublicUrlCheck.check(url, expected, Duration.ofSeconds(30));
+            if (pack == null || !expected.equals(pack.sha1Hex())) return; // A newer pack was built; its own check reports.
+            publicUrlStatus = result.matches() ? "matches" : "MISMATCH or unreachable";
+            if (result.matches()) plugin.getLogger().info(result.message());
+            else plugin.getLogger().warning(result.message());
+        });
     }
 
     /** In merged-pack mode, warns if the server's pack doesn't contain our files. */

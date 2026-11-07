@@ -92,7 +92,12 @@ pack:
   # Host players download from. Empty uses the address they connected to.
   host: ""
   # Host the pack elsewhere, such as a CDN or GitHub release. Overrides the port.
+  # {sha1} is replaced with the built pack's hash, so the address changes when the pack does.
+  # Upload plugins/BlueMapHUD/pack/bluemaphud-pack.zip unchanged; re-zipping it changes the hash.
   public-url: ""
+  # On startup and /bmhud reload, download public-url once and warn if it isn't the current pack.
+  # Turn off if the server itself can't reach that address.
+  verify-public-url: true
   # Make one boss bar colour transparent. Turn off only with the action bar.
   hide-boss-bar: true
   # Pick a colour no other pack restyles: pink, blue, red, green, yellow, purple, white.

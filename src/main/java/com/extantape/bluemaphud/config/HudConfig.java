@@ -37,7 +37,7 @@ public record HudConfig(
                           boolean showDeath) {}
 
     public record Pack(boolean send, boolean required, String kickMessage, String prompt, int port, String host,
-                       String publicUrl, boolean hideBossBar, String bossBarColor, boolean bedrockExempt,
+                       String publicUrl, boolean verifyPublicUrl, boolean hideBossBar, String bossBarColor, boolean bedrockExempt,
                        boolean reSendOnRemoval) {}
 
     public static HudConfig from(FileConfiguration c) {
@@ -109,7 +109,8 @@ public record HudConfig(
                 c.getString("pack.prompt", ""),
                 c.getInt("pack.port", 8164),
                 c.getString("pack.host", ""),
-                c.getString("pack.public-url", ""),
+                c.getString("pack.public-url", "").trim(),
+                c.getBoolean("pack.verify-public-url", true),
                 c.getBoolean("pack.hide-boss-bar", true),
                 c.getString("pack.boss-bar-color", "pink").toLowerCase(Locale.ROOT),
                 c.getBoolean("pack.bedrock-exempt", true),
