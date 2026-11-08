@@ -30,8 +30,8 @@ import java.util.zip.ZipOutputStream;
  * the optional transparent boss bar textures. No shaders are involved.
  */
 public final class PackBuilder {
-    /** 1.21.11 is the oldest supported client. The range stays open so new clients don't warn. */
-    private static final int MIN_FORMAT = 75;
+    /** Format 84 is every 26.1 client (26.1, 26.1.1, 26.1.2), the oldest supported. The range stays open so new clients don't warn. */
+    private static final int MIN_FORMAT = 84;
     private static final int MAX_FORMAT = 999;
     private static final int SHEET_COLUMNS = 16;
     private static final long FIXED_ZIP_TIME = 1_000_000_000_000L;

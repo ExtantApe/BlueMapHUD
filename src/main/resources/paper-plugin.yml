@@ -1,0 +1,32 @@
+name: BlueMapHUD
+version: '${version}'
+main: com.extantape.bluemaphud.BlueMapHudPlugin
+api-version: '26.1'
+description: A BlueMap minimap and coordinates HUD, with a fullscreen map, drawn with a resource pack font.
+website: https://github.com/ExtantApe/BlueMapHUD
+# Commands are registered with Brigadier in code, so there is no commands section.
+dependencies:
+  server:
+    # BlueMap must load first, and its API classes must be visible to this plugin.
+    BlueMap:
+      load: BEFORE
+      required: true
+      join-classpath: true
+    # Optional, for spotting Bedrock players. Reached by reflection, so it needs the classpath too.
+    floodgate:
+      load: BEFORE
+      required: false
+      join-classpath: true
+permissions:
+  bluemaphud.use:
+    description: See and control the minimap.
+    default: true
+  bluemaphud.fullscreen:
+    description: Open the fullscreen map.
+    default: true
+  bluemaphud.seeplayers:
+    description: See other players on the map.
+    default: true
+  bluemaphud.admin:
+    description: Use /bmhud reload, debug and pack commands.
+    default: op

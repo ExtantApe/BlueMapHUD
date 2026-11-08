@@ -1,16 +1,21 @@
 # BlueMapHUD
 
-A lightweight Paper plugin that shows a [BlueMap](https://bluemap.bluecolored.de/)-sourced minimap and fullscreen map on the player's screen. It uses a small resource pack with its own namespace: no client mods, no shader overrides and no held map items.
+A minimap and coordinates HUD for Paper, drawn from [BlueMap](https://bluemap.bluecolored.de/)'s tiles, with a fullscreen map too. It uses a small resource pack with its own namespace: no client mods, no shader overrides and no held map items.
 
-**Status:** pre-release. It has passed a full test suite on live Paper 1.21.11 and 26.3 servers with real BlueMap tiles, using a protocol bot. It hasn't been seen in a real game client yet. See [Testing](#testing).
+It's an unofficial add-on for BlueMap and isn't affiliated with BlueMap's authors.
 
-- Requires Paper 1.21.11 or newer, and a BlueMap version that matches your server (see below). Java Edition only.
+**Status:** pre-release. It has passed a full test suite on live Paper 26.1.2, 26.2 and 26.3 servers with real BlueMap tiles, using a protocol bot. It hasn't been seen in a real game client yet. See [Testing](#testing).
+
+- Requires Paper 26.1 or newer, Java 25, and a BlueMap version that matches your server (see below). Java Edition only. Paper 1.21.11 and older aren't supported.
 - Works alongside other resource packs, because it never overrides a shader and only adds its own files.
 
 | Server | BlueMap | Java |
 | --- | --- | --- |
-| Paper 1.21.11 | 5.18 (5.19 and newer don't load on 1.21.11) | 25 (BlueMap 5.18 needs it) |
-| Paper 26.x | 5.20 or newer | 25 |
+| Paper 26.1.2 | 5.20 or newer | 25 |
+| Paper 26.2 | 5.22 or newer (skip 5.21) | 25 |
+| Paper 26.3 | 5.24 or newer | 25 |
+
+These minimums come from BlueMap's release notes. Only BlueMap 5.29 was tested, on all three. Paper's 26.1 line has no 26.1.0 build, and 26.1.1 only had alpha builds, so 26.1.2 is the one tested.
 
 ## Install
 
@@ -91,11 +96,11 @@ Real terrain has more colour variation than the test map, so expect larger updat
 
 ## Testing
 
-`./gradlew build` compiles against the Paper 1.21.11 API and runs the tests. They include a simulated client that loads the generated pack and draws frames using the font rules read from the Minecraft 26.3 client: glyph advance, the `ascent <= height` check and text centring. It checks that every map cell lands on the right pixels and that no frame drifts.
+`./gradlew build` compiles against the Paper 26.1.2 API, the oldest supported, and runs the tests. They include a simulated client that loads the generated pack and draws frames using the font rules read from the Minecraft 26.3 client: glyph advance, the `ascent <= height` check and text centring. It checks that every map cell lands on the right pixels and that no frame drifts.
 
-The plugin has also been tested on live servers: Paper 1.21.11 with BlueMap 5.18, and Paper 26.3 with BlueMap 5.29. A protocol bot played the client, joining 26.3 through ViaBackwards. Every frame it received was decoded and compared cell by cell with BlueMap's tile files on disk.
+The plugin has also been tested on live Paper 26.1.2, 26.2 and 26.3 servers with BlueMap 5.29. A protocol bot played the client. It speaks the 1.21.11 protocol and joined through ViaBackwards, so the packets were translated rather than sent by a real 26.x client. Every frame it received was decoded and compared cell by cell with BlueMap's tile files on disk.
 
-**Passed on both servers:**
+**Passed on all three servers:**
 
 - **Map accuracy:** every zoom level, every size, all three dimensions, negative coordinates, unrendered areas and the fullscreen map. Re-rendered tiles reach the HUD within the refresh time.
 - **Icons and text:** the X, Y, Z and facing readout, heading arrows at all 8 compass points, player dots, POI markers and labels (including accents, CJK and very long labels), edge arrows, the death point and coordinates.
@@ -109,24 +114,27 @@ The plugin has also been tested on live servers: Paper 1.21.11 with BlueMap 5.18
 
 **Also passed:**
 
-- **SQL storage:** on 1.21.11, tiles held in SQLite through the HTTP source matched the same world rendered to files on all 1024 cells.
-- **Game code:** the Minecraft 26.1.2, 26.2 and 26.3 client code loads the generated pack and fonts, with the game's advances matching this project's for all 13,527 glyphs. The 1.21.11 client's bytecode uses the same glyph advance formula.
+- **SQL storage:** on 26.3, tiles held in SQLite through the HTTP source matched the same world rendered to files on all 1024 cells.
+- **Startup:** BlueMap loaded on all 8 of 8 restarts of a 26.3 server with BlueMapHUD installed.
+- **Game code:** the Minecraft 26.1.2, 26.2 and 26.3 client code loads the generated pack and fonts, with the game's advances matching this project's for all 13,527 glyphs. The 26.1, 26.1.1 and 26.1.2 clients all use resource pack format 84, the pack's minimum.
 
 **20 moving players, one minute, on real terrain:**
 
-| | Paper 1.21.11 | Paper 26.3 | Budget |
-| --- | --- | --- | --- |
-| Average frame build | 55 µs | 45 µs | 1 ms |
-| Update size, compressed (95th percentile) | 2.3 KB | 2.3 KB | 5 KB |
-| Largest update, compressed | 2.6 KB | 2.6 KB | none |
-| Server tick | 6.5 ms | 6.1 ms | 50 ms |
+| | Paper 26.1.2 | Paper 26.2 | Paper 26.3 | Budget |
+| --- | --- | --- | --- | --- |
+| Average frame build | 73 µs | 84 µs | 88 µs | 1 ms |
+| Update size, compressed (95th percentile) | 2.3 KB | 2.3 KB | 2.3 KB | 5 KB |
+| Largest update, compressed | 2.6 KB | 2.6 KB | 2.6 KB | none |
+| Server tick | 12.1 ms | 11.5 ms | 7.9 ms | 50 ms |
+
+These ran on a shared machine with other test servers running, so tick times vary with its load. One 26.3 run, with the machine's load average at 55, dropped to 18.9 TPS while its tick stayed at 18 ms; a rerun at lower load held 20 TPS.
 
 **Not tested yet:**
 
-- A real game client: how the map actually looks, the invisible boss bar, icons drawing over the map, GUI scales and screen widths, Sodium and Iris with a shader pack, and native 26.1 and 26.2 servers.
+- A real game client: how the map actually looks, the invisible boss bar, icons drawing over the map, GUI scales and screen widths, and Sodium and Iris with a shader pack.
 - The real Magic plugin. Its pack call was simulated with the same Bukkit method it uses.
 - ZigZag loaded alongside the pack in a client. It overlaps only on the pink boss bar textures, which this pack replaces.
-- A Bedrock join, MySQL or PostgreSQL storage, and back-off from another plugin's Brigadier commands.
+- A Bedrock join, including Floodgate detection through `paper-plugin.yml`'s classpath sharing, MySQL or PostgreSQL storage, and back-off from another plugin's Brigadier commands.
 
 To check a real client, join as an op and run `/bmhud debug pattern`. You should see a sharp colour gradient with a white border and no bar behind it.
 
@@ -136,7 +144,7 @@ To check a real client, join as an op and run `/bmhud debug pattern`. You should
 ./gradlew build
 ```
 
-The jar is written to `build/libs/`. Java 21 is needed to build it, and the jar runs on Java 21 and 25.
+The jar is written to `build/libs/`. Java 25 is needed to build and run it. It's a Paper plugin (`paper-plugin.yml`), so it won't load on Spigot. [docs/26x-audit.md](docs/26x-audit.md) records what changed when 1.21.11 support was dropped.
 
 ## License
 

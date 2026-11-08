@@ -15,13 +15,13 @@ public final class TileStore {
     private record Key(String mapId, int lod, int x, int z) {}
 
     /** A decoded tile. Colours are null when BlueMap has not rendered it. */
-    private record Entry(int[] argb, long sourceVersion) {}
+    private record CachedTile(int[] argb, long sourceVersion) {}
 
     private final TileSource source;
     private final Map<String, LowresSettings> settings = new ConcurrentHashMap<>();
-    private final Map<Key, Entry> tiles = new LinkedHashMap<>(32, 0.75f, true) {
+    private final Map<Key, CachedTile> tiles = new LinkedHashMap<>(32, 0.75f, true) {
         @Override
-        protected boolean removeEldestEntry(Map.Entry<Key, Entry> eldest) {
+        protected boolean removeEldestEntry(Map.Entry<Key, CachedTile> eldest) {
             return size() > MAX_TILES;
         }
     };
@@ -104,7 +104,7 @@ public final class TileStore {
     }
 
     private int[] fetch(Key key, int tileSize) throws IOException {
-        Entry cached;
+        CachedTile cached;
         synchronized (tiles) {
             cached = tiles.get(key);
         }
@@ -114,7 +114,7 @@ public final class TileStore {
         byte[] png = source.readTile(key.mapId, key.lod, key.x, key.z);
         int[] colors = png == null ? null : decodeColors(png, tileSize);
         synchronized (tiles) {
-            tiles.put(key, new Entry(colors, version));
+            tiles.put(key, new CachedTile(colors, version));
         }
         return colors;
     }

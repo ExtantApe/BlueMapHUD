@@ -144,7 +144,10 @@ public final class BlueMapHudPlugin extends JavaPlugin implements Listener {
             File file = new File(getDataFolder(), "debug-" + mapId + ".png");
             try {
                 ImageIO.write(renderDump(cache, mapId, bpc, blockX, blockZ), "png", file);
-                Bukkit.getScheduler().runTask(this, () -> player.sendMessage(Component.text("Wrote " + file.getPath(), NamedTextColor.GRAY)));
+                // A slow dump can finish after the plugin is disabled, and nothing can be scheduled then.
+                if (isEnabled()) {
+                    Bukkit.getScheduler().runTask(this, () -> player.sendMessage(Component.text("Wrote " + file.getPath(), NamedTextColor.GRAY)));
+                }
             } catch (IOException e) {
                 getLogger().log(Level.WARNING, "Could not write debug image", e);
             }

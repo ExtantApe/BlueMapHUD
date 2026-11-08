@@ -259,6 +259,11 @@ public final class HudManager {
         return count * 2 == positions.length ? positions : java.util.Arrays.copyOf(positions, count * 2);
     }
 
+    /**
+     * Vanish plugins mark players with "vanished" metadata. Paper deprecates the metadata API but offers
+     * no replacement for reading another plugin's flag, so this stays until the vanish plugins move.
+     */
+    @SuppressWarnings("deprecation")
     private static boolean isVanished(Player player) {
         for (MetadataValue value : player.getMetadata("vanished")) {
             if (value.asBoolean()) return true;

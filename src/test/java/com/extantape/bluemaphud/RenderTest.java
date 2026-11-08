@@ -99,7 +99,7 @@ class RenderTest {
         }
         JsonObject pack = JsonParser.parseString(new String(client.files.get("pack.mcmeta"), StandardCharsets.UTF_8))
                 .getAsJsonObject().getAsJsonObject("pack");
-        assertEquals(75, pack.get("min_format").getAsInt());
+        assertEquals(84, pack.get("min_format").getAsInt());
         assertEquals(999, pack.get("max_format").getAsInt());
     }
 
