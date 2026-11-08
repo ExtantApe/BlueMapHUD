@@ -143,6 +143,9 @@ public final class HudCommands {
                         .then(cornerOption("center", 0))
                         .then(cornerOption("right", 1)))
                 .then(Commands.literal("mode")
+                        .executes(player((p, s) -> reply(p, s.settings().coordsOnly
+                                ? "You're seeing coordinates only. Use /hud mode map for the minimap."
+                                : "You're seeing the minimap. Use /hud mode coords for coordinates only.")))
                         .then(Commands.literal("map").executes(player((p, s) -> setCoordsOnly(p, s, false))))
                         .then(Commands.literal("coords").executes(player((p, s) -> setCoordsOnly(p, s, true)))))
                 .then(Commands.literal("hide")

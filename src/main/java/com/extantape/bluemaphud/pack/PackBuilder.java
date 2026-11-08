@@ -37,7 +37,11 @@ public final class PackBuilder {
     private static final long FIXED_ZIP_TIME = 1_000_000_000_000L;
     private static final int RUN_CELL_WIDTH = FontLayout.MAX_RUN;
     /** The plate behind text: about half transparent, tinted black by the frame. */
-    private static final int PLATE_PIXEL = 0x80FFFFFF;
+    /**
+     * The plate is tinted black and about 69% opaque: the lightest plate that keeps both the white numbers
+     * and the dimmer facing above a 4.5:1 contrast ratio even over pure white, while the map still shows faintly.
+     */
+    private static final int PLATE_PIXEL = 0xB0FFFFFF;
     private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().create();
 
     public record Built(byte[] zip, String sha1Hex, byte[] sha1) {}

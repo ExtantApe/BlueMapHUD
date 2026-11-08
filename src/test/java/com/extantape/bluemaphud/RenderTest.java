@@ -275,7 +275,7 @@ class RenderTest {
             }
             client.draw(frame, image, BOSS_TEXT_Y);
             int plateY = BOSS_TEXT_Y + fonts.minimap.rowTop(32 + HudFonts.readoutRowOffset(fonts.minimap)) - 1;
-            assertEquals(0xFF76787B, image.getRGB(SCREEN_W / 2, plateY), "Half-dark plate over snow");
+            assertEquals(0xFF4A4B4C, image.getRGB(SCREEN_W / 2, plateY), "Dark plate over snow");
             int mapBottom = BOSS_TEXT_Y + fonts.minimap.rowTop(32);
             assertEquals(0xFFECF0F5, image.getRGB(SCREEN_W / 2, mapBottom), "A gap between the map and the plate");
 
@@ -401,6 +401,61 @@ class RenderTest {
         int[] others = {10, 10};
         Snapshot withOthers = new Snapshot("world", -1234, -60, 5678, 180f, false, 16, 40, 0, 0, false, true, others, new int[] {1, 2}, false, true);
         assertEquals(base, builder.stateKey(withOthers), "Map settings, other players and markers send nothing");
+    }
+
+    /** WCAG contrast: every readout colour must reach 4.5:1 against its plate, whatever is behind the plate. */
+    @Test
+    void readoutStaysReadableOnAnyBackground() throws IOException {
+        HudConfig config = config();
+        HudFonts fonts = new HudFonts(config);
+        SimulatedClient client = client(config, fonts);
+        FrameBuilder builder = new FrameBuilder(config, fonts, advances(), null, new MarkerService(config.markers()));
+        Component frame = builder.build(coordsOnly(-1234, -60, 5678, 180f, 0, 0), new int[0]).component();
+        int[] backgrounds = {0xFFFFFF, 0xECF0F5, 0xFFFF00, 0x00FFFF, 0xFF00FF, 0x00FF00, 0xFF0000, 0x0000FF, 0x808080, 0x000000};
+        double worst = Double.MAX_VALUE;
+        int plateX = -1, plateY = -1;
+        for (int background : backgrounds) {
+            BufferedImage image = new BufferedImage(SCREEN_W, SCREEN_H, BufferedImage.TYPE_INT_ARGB);
+            for (int y = 0; y < SCREEN_H; y++) {
+                for (int x = 0; x < SCREEN_W; x++) image.setRGB(x, y, 0xFF000000 | background);
+            }
+            client.draw(frame, image, BOSS_TEXT_Y);
+            if (plateX < 0) {
+                // Found over white, the first backgrounds: the plate's top-left pixel is margin, never text.
+                outer:
+                for (int y = 0; y < SCREEN_H; y++) {
+                    for (int x = 0; x < SCREEN_W; x++) {
+                        if ((image.getRGB(x, y) & 0xFFFFFF) != background) {
+                            plateX = x;
+                            plateY = y;
+                            break outer;
+                        }
+                    }
+                }
+            }
+            int plate = image.getRGB(plateX, plateY) & 0xFFFFFF;
+            for (int text : new int[] {0xFFFFFF, 0xBEC6D2}) {
+                double ratio = contrast(text, plate);
+                worst = Math.min(worst, ratio);
+                assertTrue(ratio >= 4.5, String.format("%06X text on the plate over %06X is only %.2f:1", text, background, ratio));
+            }
+        }
+        System.out.printf("Lowest readout contrast: %.2f:1%n", worst);
+    }
+
+    private static double contrast(int a, int b) {
+        double la = luminance(a), lb = luminance(b);
+        return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+    }
+
+    private static double luminance(int rgb) {
+        double sum = 0;
+        double[] weights = {0.0722, 0.7152, 0.2126};
+        for (int i = 0; i < 3; i++) {
+            double c = (rgb >> (i * 8) & 255) / 255.0;
+            sum += weights[i] * (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+        }
+        return sum;
     }
 
     private static Snapshot coordsOnly(int x, int y, int z, float yaw, int offsetX, int offsetY) {
