@@ -182,8 +182,9 @@ public final class HudManager {
             closeFullscreenIfExpired(session);
 
             String mapId = mapFor(player.getWorld());
-            boolean canFull = session.fullscreen && player.hasPermission("bluemaphud.fullscreen") && config.fullscreen().enabled();
-            if (!shouldShow(player, session, mapId, canFull)) {
+            boolean hasMap = !mapId.isEmpty() || session.pattern;
+            boolean canFull = hasMap && session.fullscreen && player.hasPermission("bluemaphud.fullscreen") && config.fullscreen().enabled();
+            if (!shouldShow(player, session, hasMap, canFull)) {
                 hide(player, session);
                 continue;
             }
@@ -195,13 +196,14 @@ public final class HudManager {
         }
     }
 
-    private boolean shouldShow(Player player, HudSession session, String mapId, boolean canFull) {
-        if (mapId.isEmpty() && !session.pattern) return false; // A dimension BlueMap doesn't map.
+    private boolean shouldShow(Player player, HudSession session, boolean hasMap, boolean canFull) {
+        boolean coordsOnly = session.settings.coordsOnly && !session.pattern;
+        if (!hasMap && !coordsOnly) return false; // A dimension BlueMap doesn't map. Coordinates don't need one.
         if (isBedrock(player) || !packs.ready(player)) return false;
         if (!player.hasPermission("bluemaphud.use")) return false;
         if (canFull) return true; // Fullscreen is an explicit request, and it works while the minimap is off.
         if (!session.settings.enabled) return false;
-        if (session.fullscreen && config.hud().hideWhileFullscreen()) return false;
+        if (session.fullscreen && config.hud().hideWhileFullscreen() && !coordsOnly) return false;
         if (config.hud().hideInSpectator() && player.getGameMode() == GameMode.SPECTATOR) return false;
         return !(config.hud().hideForOtherBossBar() && bossBarBlocked.getOrDefault(player.getUniqueId(), false));
     }
@@ -233,7 +235,8 @@ public final class HudManager {
         }
         return new Snapshot(mapId, location.getBlockX(), location.getBlockY(), location.getBlockZ(), location.getYaw(), full,
                 full ? settings.fullscreenZoom : settings.zoom, settings.size, settings.offsetX, settings.offsetY,
-                settings.showCoords, settings.showMarkers, visiblePlayers(player, session, location), death, session.pattern);
+                settings.showCoords, settings.showMarkers, visiblePlayers(player, session, location), death, session.pattern,
+                settings.coordsOnly && !full && !session.pattern);
     }
 
     private int[] visiblePlayers(Player viewer, HudSession session, Location at) {
@@ -305,7 +308,7 @@ public final class HudManager {
                         return;
                     }
                     long start = System.nanoTime();
-                    int cells = snapshot.fullscreen() ? config.fullscreen().width() * config.fullscreen().height() : snapshot.size() * snapshot.size();
+                    int cells = snapshot.coordsOnly() ? 0 : snapshot.fullscreen() ? config.fullscreen().width() * config.fullscreen().height() : snapshot.size() * snapshot.size();
                     if (session.grid.length < cells) session.grid = new int[cells];
                     FrameBuilder.Built built = builder.build(snapshot, session.grid);
                     buildNanos.addAndGet(System.nanoTime() - start);

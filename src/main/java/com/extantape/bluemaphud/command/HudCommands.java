@@ -136,12 +136,15 @@ public final class HudCommands {
                             s.settings().offsetX = IntegerArgumentType.getInteger(ctx, "x");
                             s.settings().offsetY = Math.min(IntegerArgumentType.getInteger(ctx, "y"), plugin.config().hud().maxOffsetY());
                             plugin.hud().saveSettings(p, s);
-                            reply(p, "Minimap moved to " + s.settings().offsetX + ", " + s.settings().offsetY + ".");
+                            reply(p, hudName(s) + " moved to " + s.settings().offsetX + ", " + s.settings().offsetY + ".");
                         })))))
                 .then(Commands.literal("corner")
                         .then(cornerOption("left", -1))
                         .then(cornerOption("center", 0))
                         .then(cornerOption("right", 1)))
+                .then(Commands.literal("mode")
+                        .then(Commands.literal("map").executes(player((p, s) -> setCoordsOnly(p, s, false))))
+                        .then(Commands.literal("coords").executes(player((p, s) -> setCoordsOnly(p, s, true)))))
                 .then(Commands.literal("hide")
                         .then(partOption("coords", false)).then(partOption("players", false)).then(partOption("markers", false)))
                 .then(Commands.literal("show")
@@ -160,13 +163,17 @@ public final class HudCommands {
         return Commands.literal(name).executes(player((p, s) -> {
             s.settings().offsetX = side * plugin.config().hud().cornerX();
             plugin.hud().saveSettings(p, s);
-            reply(p, "Minimap moved " + name + ". Fine-tune it with the offset option, because the server can't see your screen width.");
+            reply(p, hudName(s) + " moved " + name + ". Fine-tune it with the offset option, because the server can't see your screen width.");
         }));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> partOption(String part, boolean visible) {
         return Commands.literal(part).executes(player((p, s) -> {
             PlayerSettings settings = s.settings();
+            if (part.equals("coords") && !visible && settings.coordsOnly) {
+                error(p, "Coordinates are all that's showing. Use /hud off to hide them, or /hud mode map for the minimap.");
+                return;
+            }
             switch (part) {
                 case "coords" -> settings.showCoords = visible;
                 case "players" -> settings.showPlayers = visible;
@@ -180,8 +187,27 @@ public final class HudCommands {
     private void setEnabled(Player player, HudSession session, boolean enabled) {
         session.settings().enabled = enabled;
         plugin.hud().saveSettings(player, session);
-        reply(player, enabled ? "Minimap on." : "Minimap off. It stays off until you turn it on.");
-        if (enabled) plugin.explainIfNoMap(player);
+        String off = session.settings().coordsOnly ? "Coordinates off. They stay off until you turn them on." : "Minimap off. It stays off until you turn it on.";
+        reply(player, enabled ? hudName(session) + " on." : off);
+        if (enabled) explainIfHidden(player, session);
+    }
+
+    /** Choosing a mode also turns the HUD on, because that's what the player is asking to see. */
+    private void setCoordsOnly(Player player, HudSession session, boolean coordsOnly) {
+        session.settings().coordsOnly = coordsOnly;
+        session.settings().enabled = true;
+        plugin.hud().saveSettings(player, session);
+        reply(player, coordsOnly ? "Showing only coordinates. Use /hud mode map to bring the minimap back." : "Showing the minimap.");
+        explainIfHidden(player, session);
+    }
+
+    private void explainIfHidden(Player player, HudSession session) {
+        if (session.settings().coordsOnly) plugin.explainIfNoPack(player);
+        else plugin.explainIfNoMap(player);
+    }
+
+    private static String hudName(HudSession session) {
+        return session.settings().coordsOnly ? "Coordinates" : "Minimap";
     }
 
     private static Integer parseZoom(String text, int current) {
@@ -226,7 +252,7 @@ public final class HudCommands {
         HudManager hud = plugin.hud();
         sender.sendMessage(Component.text("BlueMapHUD", NamedTextColor.AQUA));
         sender.sendMessage(Component.text("Fullscreen map: toggle, or zoom <n|in|out>. Sneak + F also opens it."));
-        sender.sendMessage(Component.text("Minimap: on, off, zoom, size, offset, corner, hide and show."));
+        sender.sendMessage(Component.text("Minimap: on, off, mode map or coords, zoom, size, offset, corner, hide and show."));
         if (sender.hasPermission("bluemaphud.admin")) {
             sender.sendMessage(Component.text("Admin: /bmhud reload, debug, debug dump, debug pattern, pack export."));
             sender.sendMessage(Component.text(hud.debugLine()));

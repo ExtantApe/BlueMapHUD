@@ -37,6 +37,7 @@ If BlueMap stores its maps in SQL, set `tiles.source: http`.
 | `/hud offset <x> <y>` | Moves the minimap, in GUI pixels from top centre. |
 | `/hud corner left\|right\|center` | Moves it to a rough preset position. |
 | `/hud hide\|show coords\|players\|markers` | Toggles one part of the map. Coordinates show X, Y, Z and facing. |
+| `/hud mode coords\|map` | `coords` shows only the X, Y, Z and facing line, in the same bar, and works in worlds BlueMap doesn't map. `map` brings the minimap back. Both turn the HUD on. |
 | `/bmhud help` | Shows help. |
 | `/bmhud reload` | Reloads the config, and re-sends the pack if it changed. |
 | `/bmhud debug` | Shows cache sizes, build times and update sizes. |
@@ -71,7 +72,7 @@ The plugin sends its pack alongside any others using the multi-pack API, and pla
 
 - **Screen position:** the server can't see a player's screen size, so the map starts at top centre. Players can move it with `/hud offset` or `/hud corner`.
 - **Other boss bars:** the minimap hides for Adventure boss bars, registered Bukkit bars and the Wither and Ender Dragon. A bar made with Bukkit's unregistered `createBossBar` can't be detected, so the minimap stays up and the two share the screen.
-- **Coordinates:** the coordinate line is part of the minimap, so it hides whenever the minimap does, including during boss fights and with `/hud off`. The fullscreen map always shows it.
+- **Coordinates:** the coordinate line is part of the minimap, so it hides whenever the minimap does, including during boss fights and with `/hud off`. In `/hud mode coords` it follows the same rules, apart from also showing where BlueMap has no map. The fullscreen map always shows it.
 - **Vertical position:** `/hud offset y` moves in whole map cells, up to `hud.max-offset-y`.
 - **Action bar mode:** the map sits above the hotbar and can flicker if another plugin also uses the action bar. The fullscreen map still uses a boss bar.
 - **Other pink boss bars:** the pack makes one boss bar colour transparent, so another plugin's bar in that colour disappears too. Choose a colour with `pack.boss-bar-color` that nothing else uses.

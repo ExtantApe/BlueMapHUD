@@ -125,7 +125,14 @@ public final class BlueMapHudPlugin extends JavaPlugin implements Listener {
             player.sendMessage(Component.text(BlueMapAPI.getInstance().isPresent()
                     ? "BlueMap has no map for this world, so there's nothing to show here."
                     : "BlueMap isn't ready yet, so there's no map to show.", NamedTextColor.YELLOW));
-        } else if (!packs.ready(player)) {
+        } else {
+            explainIfNoPack(player);
+        }
+    }
+
+    /** Coordinates need the pack but not a map, so this is all that can stop them appearing. */
+    public void explainIfNoPack(Player player) {
+        if (!packs.ready(player)) {
             player.sendMessage(Component.text("Your client hasn't loaded the BlueMapHUD resource pack yet.", NamedTextColor.YELLOW));
         }
     }

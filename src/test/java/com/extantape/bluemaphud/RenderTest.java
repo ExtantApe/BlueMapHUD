@@ -265,7 +265,7 @@ class RenderTest {
         try (GridCache cache = new GridCache(new TileStore(new SolidSource()), 64, 600_000, Logger.getAnonymousLogger())) {
             FrameBuilder builder = new FrameBuilder(config, fonts, advances(),
                     new MapComposer(cache, config.hud().voidColor(), config.hud().colorStep()), new MarkerService(config.markers()));
-            Snapshot with = new Snapshot("world", -1234, -60, 5678, 180f, false, 2, 32, 0, 0, true, false, new int[0], null, false);
+            Snapshot with = new Snapshot("world", -1234, -60, 5678, 180f, false, 2, 32, 0, 0, true, false, new int[0], null, false, false);
             Component frame = builder.build(with, new int[32 * 32]).component();
             assertEquals(0, client.totalAdvance(frame), "Plates and readout must leave the frame centred");
 
@@ -279,13 +279,13 @@ class RenderTest {
             int mapBottom = BOSS_TEXT_Y + fonts.minimap.rowTop(32);
             assertEquals(0xFFECF0F5, image.getRGB(SCREEN_W / 2, mapBottom), "A gap between the map and the plate");
 
-            Snapshot without = new Snapshot("world", -1234, -60, 5678, 180f, false, 2, 32, 0, 0, false, false, new int[0], null, false);
+            Snapshot without = new Snapshot("world", -1234, -60, 5678, 180f, false, 2, 32, 0, 0, false, false, new int[0], null, false, false);
             int plain = client.totalAdvance(builder.build(without, new int[32 * 32]).component());
             assertEquals(0, plain);
 
-            Snapshot higher = new Snapshot("world", -1234, -59, 5678, 180f, false, 2, 32, 0, 0, true, false, new int[0], null, false);
+            Snapshot higher = new Snapshot("world", -1234, -59, 5678, 180f, false, 2, 32, 0, 0, true, false, new int[0], null, false, false);
             assertNotEquals(builder.stateKey(with), builder.stateKey(higher), "Climbing changes the readout");
-            Snapshot higherHidden = new Snapshot("world", -1234, -59, 5678, 180f, false, 2, 32, 0, 0, false, false, new int[0], null, false);
+            Snapshot higherHidden = new Snapshot("world", -1234, -59, 5678, 180f, false, 2, 32, 0, 0, false, false, new int[0], null, false, false);
             assertEquals(builder.stateKey(without), builder.stateKey(higherHidden), "With coordinates hidden, climbing sends nothing");
         }
     }
@@ -328,7 +328,7 @@ class RenderTest {
     }
 
     private static Snapshot snap(int x, int z, float yaw, int[] others) {
-        return new Snapshot("world", x, 70, z, yaw, false, 2, 32, 0, 0, true, false, others, null, false);
+        return new Snapshot("world", x, 70, z, yaw, false, 2, 32, 0, 0, true, false, others, null, false, false);
     }
 
     @Test
@@ -351,10 +351,66 @@ class RenderTest {
             assertNotEquals(base, builder.stateKey(snap(10, 10, 0f, new int[] {20, 20})), "Another player");
 
             // Without coordinates, moving inside one cell draws the same picture.
-            Snapshot a = new Snapshot("world", 10, 70, 10, 0f, false, 2, 32, 0, 0, false, false, new int[0], null, false);
-            Snapshot b = new Snapshot("world", 11, 70, 11, 0f, false, 2, 32, 0, 0, false, false, new int[0], null, false);
+            Snapshot a = new Snapshot("world", 10, 70, 10, 0f, false, 2, 32, 0, 0, false, false, new int[0], null, false, false);
+            Snapshot b = new Snapshot("world", 11, 70, 11, 0f, false, 2, 32, 0, 0, false, false, new int[0], null, false, false);
             assertEquals(builder.stateKey(a), builder.stateKey(b));
         }
+    }
+
+    @Test
+    void coordsOnlyDrawsJustTheReadoutAndNeedsNoMap() throws IOException {
+        HudConfig config = config();
+        HudFonts fonts = new HudFonts(config);
+        SimulatedClient client = client(config, fonts);
+        // No composer and no map: this must work in a dimension BlueMap doesn't map, or with BlueMap away.
+        FrameBuilder builder = new FrameBuilder(config, fonts, advances(), null, new MarkerService(config.markers()));
+        Snapshot only = coordsOnly(-1234, -60, 5678, 180f, 0, 0);
+        FrameBuilder.Built built = builder.build(only, new int[0]);
+        Component frame = built.component();
+        assertEquals(0, client.totalAdvance(frame), "It must stay centred");
+
+        BufferedImage image = new BufferedImage(SCREEN_W, SCREEN_H, BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < SCREEN_H; y++) {
+            for (int x = 0; x < SCREEN_W; x++) image.setRGB(x, y, 0xFFECF0F5);
+        }
+        client.draw(frame, image, BOSS_TEXT_Y);
+        int minX = SCREEN_W, maxX = -1, minY = SCREEN_H, maxY = -1;
+        for (int y = 0; y < SCREEN_H; y++) {
+            for (int x = 0; x < SCREEN_W; x++) {
+                if (image.getRGB(x, y) == 0xFFECF0F5) continue;
+                minX = Math.min(minX, x);
+                maxX = Math.max(maxX, x);
+                minY = Math.min(minY, y);
+                maxY = Math.max(maxY, y);
+            }
+        }
+        assertEquals(com.extantape.bluemaphud.render.FontLayout.PLATE_HEIGHT, maxY - minY + 1, "Just one plate high");
+        assertTrue(Math.abs((minX + maxX) / 2 - SCREEN_W / 2) <= 2, "Centred at the top: " + minX + " to " + maxX);
+        assertTrue(maxX - minX < 100, "Only a short line: " + (maxX - minX));
+        ImageIO.write(image.getSubimage(SCREEN_W / 2 - 80, 0, 160, 40), "png", previewFile("coords-only.png"));
+
+        long base = builder.stateKey(only);
+        assertEquals(base, builder.stateKey(coordsOnly(-1234, -60, 5678, 185f, 0, 0)), "A small turn stays the same");
+        assertNotEquals(base, builder.stateKey(coordsOnly(-1234, -60, 5678, 90f, 0, 0)), "Facing");
+        assertNotEquals(base, builder.stateKey(coordsOnly(-1233, -60, 5678, 180f, 0, 0)), "X");
+        assertNotEquals(base, builder.stateKey(coordsOnly(-1234, -59, 5678, 180f, 0, 0)), "Y");
+        assertNotEquals(base, builder.stateKey(coordsOnly(-1234, -60, 5679, 180f, 0, 0)), "Z");
+        assertNotEquals(base, builder.stateKey(coordsOnly(-1234, -60, 5678, 180f, 10, 0)), "Offset X");
+        assertNotEquals(base, builder.stateKey(coordsOnly(-1234, -60, 5678, 180f, 0, 16)), "Offset Y");
+
+        int[] others = {10, 10};
+        Snapshot withOthers = new Snapshot("world", -1234, -60, 5678, 180f, false, 16, 40, 0, 0, false, true, others, new int[] {1, 2}, false, true);
+        assertEquals(base, builder.stateKey(withOthers), "Map settings, other players and markers send nothing");
+    }
+
+    private static Snapshot coordsOnly(int x, int y, int z, float yaw, int offsetX, int offsetY) {
+        return new Snapshot("", x, y, z, yaw, false, 2, 32, offsetX, offsetY, true, true, new int[0], null, false, true);
+    }
+
+    private static File previewFile(String name) {
+        File folder = new File("build/preview");
+        folder.mkdirs();
+        return new File(folder, name);
     }
 
     /** Writes previews to build/preview for checking the look by eye, and times frame building. */
@@ -376,15 +432,15 @@ class RenderTest {
 
             int[] others = {30, 12, -24, 40, 8, -50};
             int[] grid = new int[config.fullscreen().width() * config.fullscreen().height()];
-            Snapshot mini = new Snapshot("world", 4, 70, 4, -135f, false, 2, 32, 0, 0, true, false, others, new int[] {-20, -20}, false);
+            Snapshot mini = new Snapshot("world", 4, 70, 4, -135f, false, 2, 32, 0, 0, true, false, others, new int[] {-20, -20}, false, false);
             preview(client, builder.build(mini, grid).component(), new File(folder, "minimap.png"));
             previewOn(client, builder.build(mini, grid).component(), new File(folder, "minimap-snow.png"), 0xFFECF0F5);
 
-            Snapshot full = new Snapshot("world", 4, 70, 4, -135f, true, 8, 32, 0, 0, true, false, others, new int[] {-20, -20}, false);
+            Snapshot full = new Snapshot("world", 4, 70, 4, -135f, true, 8, 32, 0, 0, true, false, others, new int[] {-20, -20}, false, false);
             preview(client, builder.build(full, grid).component(), new File(folder, "fullscreen.png"));
             previewOn(client, builder.build(full, grid).component(), new File(folder, "fullscreen-snow.png"), 0xFFECF0F5);
 
-            Snapshot pattern = new Snapshot("world", 4, 70, 4, 180f, false, 2, 32, 0, 0, true, false, new int[0], null, true);
+            Snapshot pattern = new Snapshot("world", 4, 70, 4, 180f, false, 2, 32, 0, 0, true, false, new int[0], null, true, false);
             preview(client, builder.build(pattern, grid).component(), new File(folder, "pattern.png"));
 
             // Warm up, then time the real work on one background thread.

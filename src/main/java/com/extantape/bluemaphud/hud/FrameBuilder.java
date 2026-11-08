@@ -48,6 +48,16 @@ public final class FrameBuilder {
 
     /** A number that stays the same exactly when a new frame would look the same. */
     public long stateKey(Snapshot s) {
+        if (s.coordsOnly()) {
+            long key = 1;
+            key = key * 31 + s.blockX();
+            key = key * 31 + s.blockY();
+            key = key * 31 + s.blockZ();
+            key = key * 31 + compassIndex(s.yaw());
+            key = key * 31 + s.offsetX();
+            key = key * 31 + s.offsetY();
+            return key;
+        }
         int bpc = s.zoom();
         int width = width(s), height = height(s);
         int cellX = Math.floorDiv(s.blockX(), bpc), cellZ = Math.floorDiv(s.blockZ(), bpc);
@@ -76,6 +86,7 @@ public final class FrameBuilder {
 
     /** Builds a frame, reusing the session's grid buffer. */
     public Built build(Snapshot s, int[] grid) {
+        if (s.coordsOnly()) return buildCoordsOnly(s);
         boolean full = s.fullscreen();
         FontLayout layout = full ? fonts.fullscreen : fonts.minimap;
         int width = width(s), height = height(s);
@@ -118,6 +129,15 @@ public final class FrameBuilder {
         int textRow = height + HudFonts.readoutRowOffset(layout);
         if (full || s.showCoords()) drawReadout(frame, s, width * layout.step(), textRow);
         if (full) drawLegend(frame, s, width * layout.step(), others.length / 2, count, textRow);
+        return new Built(frame.finish(), frame.estimatedBytes());
+    }
+
+    /** The coordinate line alone, where it would sit under a map with no rows. Moves with the player's offset. */
+    private Built buildCoordsOnly(Snapshot s) {
+        FontLayout layout = fonts.minimap;
+        int offsetRows = Math.min(fonts.maxOffsetRows, s.offsetY() / layout.step());
+        MapFrame frame = new MapFrame(layout, iconAdvances, 0, 0, s.offsetX(), offsetRows);
+        drawReadout(frame, s, 0, HudFonts.readoutRowOffset(layout));
         return new Built(frame.finish(), frame.estimatedBytes());
     }
 
@@ -164,7 +184,11 @@ public final class FrameBuilder {
     }
 
     private static String compass(float yaw) {
-        return COMPASS[Math.floorMod((int) Math.round((yaw + 180.0) / 45.0), COMPASS.length)];
+        return COMPASS[compassIndex(yaw)];
+    }
+
+    private static int compassIndex(float yaw) {
+        return Math.floorMod((int) Math.round((yaw + 180.0) / 45.0), COMPASS.length);
     }
 
     /** A test pattern for checking crisp colours, alignment and the invisible bar. */
