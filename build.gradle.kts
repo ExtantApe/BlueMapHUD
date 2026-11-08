@@ -18,6 +18,9 @@ repositories {
 // Built against the oldest supported Paper, so nothing newer than 26.1 sneaks in.
 val paperApi = "io.papermc.paper:paper-api:26.1.2.build.74-stable"
 val blueMapApi = "de.bluecolored:bluemap-api:2.7.8"
+// Shared with the test-only plugins in test/live.
+extra["paperApi"] = paperApi
+extra["blueMapApi"] = blueMapApi
 
 dependencies {
     compileOnly(paperApi)

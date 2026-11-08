@@ -101,6 +101,8 @@ Real terrain has more colour variation than the test map, so expect larger updat
 
 The plugin has also been tested on live Paper 26.1.2, 26.2 and 26.3 servers with BlueMap 5.29. A protocol bot played the client. It speaks the 1.21.11 protocol and joined through ViaBackwards, so the packets were translated rather than sent by a real 26.x client. Every frame it received was decoded and compared cell by cell with BlueMap's tile files on disk.
 
+The live tests are in [`test/live`](test/live/README.md), with what they cover and what's simulated. `test/live/run.sh` builds a throwaway server, runs them and deletes it.
+
 **Passed on all three servers:**
 
 - **Map accuracy:** every zoom level, every size, all three dimensions, negative coordinates, unrendered areas and the fullscreen map. Re-rendered tiles reach the HUD within the refresh time.

@@ -1,0 +1,11 @@
+name: LiveTestHelper
+version: '1'
+main: com.extantape.bluemaphud.livetest.Helper
+api-version: '26.1'
+description: Test only. Lets the live tests act like other plugins. Never install it on a real server.
+dependencies:
+  server:
+    BlueMap:
+      load: BEFORE
+      required: true
+      join-classpath: true

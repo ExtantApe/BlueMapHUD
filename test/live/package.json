@@ -1,0 +1,13 @@
+{
+  "name": "bluemaphud-live-tests",
+  "private": true,
+  "description": "Live tests for BlueMapHUD: throwaway Paper servers driven by a protocol bot.",
+  "license": "MIT",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "mineflayer": "4.39.0"
+  }
+}

@@ -4,3 +4,7 @@ run/
 .idea/
 *.iml
 .DS_Store
+
+# Live tests: server jars, throwaway servers and logs, and npm packages.
+test/live/work/
+test/live/node_modules/
