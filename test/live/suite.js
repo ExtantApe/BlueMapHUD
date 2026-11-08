@@ -143,6 +143,105 @@ const GROUPS = {
     await b.cleanQuit();
   },
 
+  async share() {
+    section('Sharing coordinates');
+    baseConfig({ 'share.cooldown-seconds': 0 }); await reload();
+    await s.run('bmt mkworld otherworld', /BMT mkworld/, 60000);
+    const t = await join('Tester');
+    const alex = await join('Alex'), blair = await join('Blair'), casey = await join('Casey'), drew = await join('Drew');
+    await tp('Tester', 8, 120, -9); await tp('Alex', 20, 120, 20); await tp('Blair', -20, 120, 5);
+    s.cmd('execute in minecraft:the_nether run tp Casey 0 70 0');
+    s.cmd('execute in minecraft:otherworld run tp Drew 0 100 0');
+    await sleep(1500);
+    const heard = (bot, from) => bot.chat.slice(from).find((m) => /shared where they are/.test(m));
+    const marks = () => [alex, blair, casey, drew].map((b) => b.chat.length);
+    const got = (m) => [alex, blair, casey, drew].map((b, i) => heard(b, m[i]) ? b.bot.username : null).filter(Boolean);
+
+    let m = marks(), log = s.mark();
+    let sent = await chat(t, '/hud share Alex', /Sent your coordinates/);
+    await sleep(500);
+    check('Sharing with one person reaches only them', sent && JSON.stringify(got(m)) === '["Alex"]', `${sent} | ${got(m)}`);
+    check('They see who sent it, the coordinates and the dimension', heard(alex, m[0]) === 'Tester shared where they are: 8 120 -9 in the Overworld', heard(alex, m[0]));
+    check('The sender is told exactly who got it', sent === 'Sent your coordinates (8 120 -9) to 1 player: Alex.', sent);
+    check('The share is logged to the console', /Tester shared 8 120 -9 in world with Alex/.test(s.since(log)));
+
+    m = marks();
+    sent = await chat(t, '/hud share everyone', /Sent your coordinates/); await sleep(500);
+    check('Everyone means the sender\'s world group, the Nether included', JSON.stringify(got(m)) === '["Alex","Blair","Casey"]', `${sent} | ${got(m)}`);
+    check('Not someone in another world', !got(m).includes('Drew'));
+
+    m = marks();
+    const none = await chat(t, '/hud share Drew', /can receive|Sent/);
+    check('Naming someone in another world sends nothing', /Nobody you picked can receive/.test(none || '') && got(m).length === 0, none);
+
+    await chat(alex, '/hud hide shares', /won't receive/);
+    m = marks();
+    sent = await chat(t, '/hud share everyone', /Sent your coordinates/); await sleep(500);
+    check('A player who turned shares off doesn\'t get them', JSON.stringify(got(m)) === '["Blair","Casey"]', got(m).join(','));
+    const off = await chat(t, '/hud share Alex', /can receive|Sent/);
+    check('Naming them says it can\'t reach them', /Nobody you picked/.test(off || ''), off);
+    await chat(alex, '/hud show shares', /You'll receive/);
+
+    s.cmd('bmt perm Blair bluemaphud.share.receive false'); await sleep(300);
+    m = marks(); await chat(t, '/hud share everyone', /Sent your coordinates/); await sleep(500);
+    check('Without bluemaphud.share.receive nothing arrives', !got(m).includes('Blair') && got(m).includes('Alex'), got(m).join(','));
+    s.cmd('bmt perm Blair bluemaphud.share.receive true');
+    s.cmd('bmt perm Tester bluemaphud.share.send false'); await sleep(300);
+    const denied = await chat(t, '/hud share Alex', /can't share|Sent|Unknown/);
+    check('Without bluemaphud.share.send the sender is told no', /can't share your coordinates/.test(denied || ''), denied);
+    s.cmd('bmt perm Tester bluemaphud.share.send true');
+    s.cmd('bmt hidefrom Tester Alex on'); await sleep(300);
+    const hidden = await chat(t, '/hud share Alex', /Nobody called|Sent/);
+    check('A player hidden from the sender can\'t be named', /Nobody called Alex is online/.test(hidden || ''), hidden);
+    s.cmd('bmt hidefrom Tester Alex off'); await sleep(300);
+
+    await s.run('bmt sharefilter remove Blair', /BMT sharefilter/);
+    m = marks(); log = s.mark();
+    sent = await chat(t, '/hud share everyone', /Sent your coordinates/); await sleep(500);
+    const notSent = t.chat.slice(-3).find((x) => /^Not sent to/.test(x));
+    check('A rules plugin can remove a recipient', JSON.stringify(got(m)) === '["Alex","Casey"]', got(m).join(','));
+    check('It saw everyone offered first', /BMT share from Tester at 8 120 -9 to \[Alex, Blair, Casey\]/.test(s.since(log)), s.since(log).split('\n').find((l) => /BMT share/.test(l)));
+    check('The sender hears who was left out', /Not sent to Blair/.test(notSent || ''), notSent);
+    await s.run('bmt sharefilter cancel', /BMT sharefilter/);
+    m = marks();
+    const cancelled = await chat(t, '/hud share Alex', /weren't sent|Sent/);
+    check('A rules plugin can stop a share', /weren't sent/.test(cancelled || '') && got(m).length === 0, cancelled);
+    await s.run('bmt sharefilter off', /BMT sharefilter/);
+
+    baseConfig({ 'share.cooldown-seconds': 0, 'share.candidates': 'all-online' }); await reload();
+    m = marks();
+    const fallback = await chat(t, '/hud share Drew', /can receive|Sent/);
+    check('all-online with nothing filtering stays in the world group', /Nobody you picked/.test(fallback || '') && got(m).length === 0, fallback);
+    await s.run('bmt sharefilter log', /BMT sharefilter/);
+    m = marks();
+    sent = await chat(t, '/hud share Drew', /can receive|Sent/); await sleep(500);
+    check('all-online with a filter reaches other worlds', /to 1 player: Drew/.test(sent || '') && got(m).includes('Drew'), sent);
+    await s.run('bmt sharefilter off', /BMT sharefilter/);
+
+    baseConfig({ 'share.cooldown-seconds': 30 }); await reload();
+    await chat(t, '/hud share Alex', /Sent/);
+    const wait = await chat(t, '/hud share Alex', /share again|Sent/);
+    check('A cooldown stops repeated shares', /You can share again in (2\d|30) seconds/.test(wait || ''), wait); // A busy machine slows the round trip.
+    baseConfig({ 'share.cooldown-seconds': 0, 'share.enabled': false }); await reload();
+    const disabled = await chat(t, '/hud share Alex', /turned off|Sent/);
+    check('share.enabled: false turns it off', /turned off on this server/.test(disabled || ''), disabled);
+
+    baseConfig({ 'share.cooldown-seconds': 0 }); await reload();
+    const dialogs = [];
+    t.bot._client.on('show_dialog', (p) => dialogs.push(p));
+    t.say('/hud share');
+    await until(() => dialogs.length > 0, 4000);
+    const dump = JSON.stringify(dialogs[0] || null);
+    console.log('  DIALOG ' + dump.slice(0, 3000));
+    check('/hud share opens a dialog', dialogs.length === 1, `${dialogs.length} dialogs`);
+    check('It offers the people in the world group, and nobody else', /Alex/.test(dump) && /Blair/.test(dump) && /Casey/.test(dump) && !/Drew/.test(dump));
+    check('with a tick box for each and both send buttons', (dump.match(/minecraft:boolean/g) || []).length === 3 && /Send to the people I ticked/.test(dump) && /Send to everyone here \(3\)/.test(dump) && /paper:dialog_click_callback/.test(dump));
+    // Pressing the buttons isn't tested: the bot's protocol library has no dialog click packet. They run Paper's
+    // own callbacks into the same share code the commands above test.
+    for (const b of [alex, blair, casey, drew]) await b.cleanQuit();
+    await t.cleanQuit();
+  },
+
   /** Measures what the clock costs a player who stands still. Not run by default; see docs/decisions.md. */
   async clockrate() {
     section('What the clock costs an idle player');
@@ -768,8 +867,22 @@ const GROUPS = {
     const d = await join('Decline', { mode: 'decline', settle: 1200 });
     check('Declining a required pack kicks with the custom message', d.kicked && d.kicked.includes('needs the BlueMapHUD'), d.kicked);
     await d.cleanQuit();
-    const fl = await join('FailDl', { mode: 'fail', settle: 1200 });
-    check('A failed download of a required pack kicks', !!fl.kicked, fl.kicked); await fl.cleanQuit();
+    // An admin online, to hear about it.
+    const admin = await join('Tester');
+    const fm = s.mark();
+    const fl = await join('FailDl', { mode: 'fail', settle: 2000 });
+    check('A failed download never kicks, even with the pack required', !fl.kicked && fl.ended === null, fl.kicked);
+    check('The player is told the map is off and will try again', fl.chat.some((m) => /couldn't be downloaded, so the map is off for now/.test(m)), fl.chat.slice(-3).join(' | '));
+    check('No map without the pack', fl.frames.length === 0, `${fl.frames.length} frames`);
+    check('The console says who and why', /FailDl didn't get the BlueMapHUD pack: the download failed/.test(s.since(fm)));
+    check('Admins online are warned', admin.chat.some((m) => /FailDl couldn't download the map's pack/.test(m)), admin.chat.slice(-2).join(' | '));
+    const pushes = fl.pushes.length;
+    fl.mode = 'accept'; // The hosting is fixed.
+    s.cmd('execute in minecraft:the_nether run tp FailDl 0 70 0');
+    check('Changing world tries again', await until(() => fl.pushes.length > pushes, 5000), `${fl.pushes.length - pushes} new pushes`);
+    s.cmd('execute in minecraft:overworld run tp FailDl 0 120 0');
+    check('and once the pack loads, the map appears', await until(() => fl.frames.length > 0, 8000), `${fl.frames.length} frames`);
+    await fl.cleanQuit(); await admin.cleanQuit();
     const ig = await join('Ignore', { mode: 'ignore', settle: 2500 });
     check('No frames before the client confirms the pack', ig.frames.length === 0 && !ig.kicked, ig.frames.length); await ig.cleanQuit();
 
@@ -1069,7 +1182,7 @@ const GROUPS = {
     const m = s.mark();
     try { await GROUPS[n](); } catch (e) { check(`Group ${n} finished`, false, e.stack?.slice(0, 400)); }
     for (const bot of liveBots.splice(0)) if (bot.ended === null) await bot.cleanQuit();
-    const hudErrors = s.errors(m).filter((l) => /extantape|\[BlueMapHUD\]/.test(l) && !/icons must be|Ignoring|no resource pack|doesn't contain|Could not download pack.public-url \(http:\/\/127.0.0.1:\d+\/custom.zip\)|no theme called sparkles|Theme broken couldn't be loaded|Theme ocean is hard to read/.test(l));
+    const hudErrors = s.errors(m).filter((l) => /extantape|\[BlueMapHUD\]/.test(l) && !/icons must be|Ignoring|no resource pack|doesn't contain|Could not download pack.public-url \(http:\/\/127.0.0.1:\d+\/custom.zip\)|no theme called sparkles|Theme broken couldn't be loaded|Theme ocean is hard to read|FailDl didn't get the BlueMapHUD pack/.test(l));
     check(`No BlueMapHUD errors during ${n}`, hudErrors.length === 0, hudErrors[0]?.slice(0, 200) || '');
     const drops = s.since(m).split('\n').filter((l) => /lost connection: (?!Disconnected|This server needs|.*resource pack)/.test(l));
     check(`No unexpected disconnects during ${n}`, drops.length === 0, drops[0]?.slice(0, 160) || '');

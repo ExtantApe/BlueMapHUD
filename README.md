@@ -37,6 +37,9 @@ If BlueMap stores its maps in SQL, set `tiles.source: http`.
 | `/hud offset <x> <y>` | Moves the minimap, in GUI pixels from top centre. |
 | `/hud corner left\|right\|center` | Moves it to a rough preset position. |
 | `/hud hide\|show coords\|players\|markers\|clock` | Toggles one part of the map. Coordinates show X, Y, Z and facing; the clock adds the in-game time after them. |
+| `/hud share` | Asks who to send your coordinates to: tick people in a dialog, or send to everyone you can. |
+| `/hud share <names>`, `/hud share everyone` | The same without the dialog. Names are separated by spaces or commas. |
+| `/hud hide\|show shares` | Stops or restarts receiving coordinates other players share. |
 | `/hud theme`, `/hud theme <name>\|default` | Lists the themes, with yours marked and each one clickable, or switches to one. `default` goes back to the server's. The choice is saved per player. |
 | `/hud mode coords\|map` | `coords` shows only the X, Y, Z and facing line, in the same bar, and works in worlds BlueMap doesn't map. `map` brings the minimap back. Both turn the HUD on, and `/hud mode` alone says which one you have. New players start in `hud.default-mode`, which is `map` unless the config says `coords`. |
 | `/bmhud help` | Shows help. |
@@ -55,6 +58,8 @@ If another plugin owns a name, BlueMapHUD backs off: `/map` to `/worldmap`, then
 | `bluemaphud.use` | everyone | Seeing the map at all. Removing it hides everything for that group. |
 | `bluemaphud.fullscreen` | everyone | The fullscreen map. |
 | `bluemaphud.seeplayers` | everyone | Other players on the map. |
+| `bluemaphud.share.send` | everyone | Sharing your coordinates with `/hud share`. |
+| `bluemaphud.share.receive` | everyone | Receiving coordinates other players share. |
 | `bluemaphud.admin` | ops | `/bmhud reload`, `debug` and `pack`. |
 
 ## Themes and the clock
@@ -82,9 +87,19 @@ The clock follows the coordinates as a small picture and 24-hour time, such as `
 
 Up to 8 themes fit in the pack. Every built-in theme passes the same readability test, and the plugin warns about one of yours that doesn't. Text needs a WCAG contrast of 4.5:1 against the plate, and three quarters of each clock picture needs 3:1. Both are checked over ten backgrounds from white to black, including the brightest pure colours. A theme that fails still loads, so you can fix it.
 
+## Sharing coordinates
+
+`/hud share` sends your current coordinates to people you choose, as a chat message with the coordinates and the dimension, such as `Alex shared where they are: 120 64 -35 in the Overworld`. Clicking the numbers copies them. Nothing is shared unless a player asks, and there's no teleport link.
+
+- **Who can receive:** by default, players in the sender's world, counting its `_nether` and `_the_end` as the same world, who can see the sender, have `bluemaphud.share.receive`, and haven't turned shares off with `/hud hide shares`.
+- **Feedback:** the sender is told exactly who got their coordinates, and who couldn't.
+- **Limits:** a player waits `share.cooldown-seconds` (30 by default) between shares, and each share is logged to the console. `share.enabled: false` turns sharing off.
+
+**Your server's own rules.** BlueMapHUD fires `com.extantape.bluemaphud.api.CoordinateShareEvent` on the main thread before each share. It carries the sender, the world, the block coordinates and a mutable set of recipients. A plugin can remove recipients, for example to match who may chat with whom, or cancel the share. With `share.candidates: all-online`, recipients can include every player online, so that such a plugin can follow rules that reach across worlds. BlueMapHUD only widens a share like that while a plugin is listening to the event, and logs a warning at startup if nothing is. To build against it, depend on BlueMapHUD as a server dependency with `join-classpath: true` in your `paper-plugin.yml`.
+
 ## Resource packs
 
-The plugin sends its pack alongside any others using the multi-pack API, and players don't see a map until their client confirms it loaded. Its only file outside its own namespace is a transparent boss bar texture, in pink by default. If another pack restyles that colour, set `pack.boss-bar-color` to one it leaves alone.
+The plugin sends its pack alongside any others using the multi-pack API, and players don't see a map until their client confirms it loaded. With `pack.required`, a player who declines the pack is kicked with `pack.kick-message`. A download that fails never kicks: the player plays without the map and is told why, admins are warned, and the pack is offered again when they change worlds or rejoin. Its only file outside its own namespace is a transparent boss bar texture, in pink by default. If another pack restyles that colour, set `pack.boss-bar-color` to one it leaves alone.
 
 **Using it with Magic.** Magic sends its pack with Bukkit's older one-pack method, which clears every other server pack. BlueMapHUD re-sends its pack once when that happens, but it's better to stop the conflict. In `plugins/Magic/config.yml` set `resource_pack: ""`, then add Magic's pack to your main pack.
 
@@ -110,7 +125,7 @@ The plugin sends its pack alongside any others using the multi-pack API, and pla
 
 Each map cell is one or more characters in a generated font, coloured with hex text colour and with the shadow turned off, so a whole map is a single text component shown as a boss bar title. Colours come from BlueMap's low-res tiles, which are shrunk once and cached in 64x64 cell chunks by two background threads.
 
-Every 5 ticks the main thread copies each player's state, and background threads compare it with the last frame. If nothing visible changed, nothing is sent.
+Every 5 ticks the main thread copies each player's state, and background threads compare it with the last frame. If nothing visible changed, nothing is sent. The clock counts as a change once per step.
 
 Measured in the test suite on a synthetic map:
 
@@ -134,10 +149,13 @@ The live tests are in [`test/live`](test/live/README.md), with what they cover a
 
 - **Map accuracy:** every zoom level, every size, all three dimensions, negative coordinates, unrendered areas and the fullscreen map. Re-rendered tiles reach the HUD within the refresh time.
 - **Icons and text:** the X, Y, Z and facing readout, heading arrows at all 8 compass points, player dots, POI markers and labels (including accents, CJK and very long labels), edge arrows, the death point and coordinates.
+- **Clock:** the right time and picture at noon, dusk, midnight and sunrise, nothing new sent inside a step, the line never moving as the time changes, `/hud hide clock`, no clock in the Nether, and the minimap and fullscreen map.
+- **Themes:** every theme's clock, plate and colours, the same size line in each, `/hud theme` listing and switching, saved choices, the server's default, unknown names, and a server's own theme loading, failing to parse, or warned as hard to read.
+- **Sharing:** one person, everyone in the world group (the Nether included, another world not), players who turned shares off, the send and receive permissions, players hidden from the sender, a rules plugin removing a recipient or cancelling the share, `all-online` with and without a filter, the cooldown, `share.enabled: false`, and the dialog's contents.
 - **One boss bar:** the map and coordinates share a single bar. A second never appeared through every `/hud` option, fullscreen, sneak + F, reloads, pack re-sends, auto-hide and a full `/reload`.
 - **Hiding:** vanish, `hidePlayer`, spectators, invisibility, players hidden in BlueMap, the radius, other dimensions, permissions, other boss bars, the Wither, the Ender Dragon and every `auto-hide` setting.
-- **Updates:** nothing is sent while idle, and at most 4 updates a second otherwise.
-- **Pack handling:** required, optional, declined and failed downloads, `host`, `public-url` with and without `{sha1}`, the hosted-pack check (matching, stale, missing, unreachable, never answering, invalid and turned off), `send: false`, bar colours, custom icons, and another plugin wiping packs with the old one-pack method.
+- **Updates:** nothing is sent while idle apart from each clock step, and at most 4 updates a second otherwise.
+- **Pack handling:** required, optional and declined packs, failed downloads (no kick, a message, an admin warning and a retry on world change), `host`, `public-url` with and without `{sha1}`, the hosted-pack check (matching, stale, missing, unreachable, never answering, invalid and turned off), `send: false`, bar colours, custom icons, and another plugin wiping packs with the old one-pack method.
 - **Life cycle:** `/bmhud reload`, `/bluemap reload`, a full `/reload`, server restarts, saved settings and quick join/quits.
 - **Bad data:** corrupt tiles, a wrong web root, an unreachable webserver and the far edge of the world.
 - **Other setups:** the action bar channel, the HTTP source, and command back-off from another plugin's `plugin.yml` commands.
@@ -146,16 +164,16 @@ The live tests are in [`test/live`](test/live/README.md), with what they cover a
 
 - **SQL storage:** on 26.3, tiles held in SQLite through the HTTP source matched the same world rendered to files on all 1024 cells.
 - **Startup:** BlueMap loaded on all 8 of 8 restarts of a 26.3 server with BlueMapHUD installed.
-- **Game code:** the Minecraft 26.1.2, 26.2 and 26.3 client code loads the generated pack and fonts, with the game's advances matching this project's for all 13,527 glyphs. The 26.1, 26.1.1 and 26.1.2 clients all use resource pack format 84, the pack's minimum.
+- **Game code:** the Minecraft 26.1.2, 26.2 and 26.3 client code loads the generated pack and fonts, with the game's advances matching this project's for all 18,944 glyphs, the clock pictures and fixed-width time digits included. The 26.1, 26.1.1 and 26.1.2 clients all use resource pack format 84, the pack's minimum.
 
-**20 moving players, one minute, on real terrain:**
+**20 moving players, one minute, on real terrain.** 26.3 is this release, with themes and the clock; 26.1.2 and 26.2 were measured on the build just before them:
 
 | | Paper 26.1.2 | Paper 26.2 | Paper 26.3 | Budget |
 | --- | --- | --- | --- | --- |
-| Average frame build | 73 µs | 84 µs | 88 µs | 1 ms |
-| Update size, compressed (95th percentile) | 2.3 KB | 2.3 KB | 2.3 KB | 5 KB |
-| Largest update, compressed | 2.6 KB | 2.6 KB | 2.6 KB | none |
-| Server tick | 12.1 ms | 11.5 ms | 7.9 ms | 50 ms |
+| Average frame build | 73 µs | 84 µs | 63 µs | 1 ms |
+| Update size, compressed (95th percentile) | 2.3 KB | 2.3 KB | 2.1 KB | 5 KB |
+| Largest update, compressed | 2.6 KB | 2.6 KB | 2.2 KB | none |
+| Server tick | 12.1 ms | 11.5 ms | 7.6 ms | 50 ms |
 
 These ran on a shared machine with other test servers running, so tick times vary with its load. One 26.3 run, with the machine's load average at 55, dropped to 18.9 TPS while its tick stayed at 18 ms; a rerun at lower load held 20 TPS.
 
@@ -163,6 +181,7 @@ These ran on a shared machine with other test servers running, so tick times var
 
 - A real game client: how the map actually looks, the invisible boss bar, icons drawing over the map, GUI scales and screen widths, and Sodium and Iris with a shader pack.
 - The real Magic plugin. Its pack call was simulated with the same Bukkit method it uses.
+- Pressing the `/hud share` dialog's buttons. The bot checks the dialog it's sent, but can't click one. The buttons run the same code as `/hud share <names>` and `/hud share everyone`, which are tested.
 - ZigZag loaded alongside the pack in a client. It overlaps only on the pink boss bar textures, which this pack replaces.
 - A Bedrock join, including Floodgate detection through `paper-plugin.yml`'s classpath sharing, MySQL or PostgreSQL storage, and back-off from another plugin's Brigadier commands.
 

@@ -11,7 +11,7 @@ public final class PlayerSettings {
     /** The theme is a name, so it survives themes being added or removed. */
     private static final NamespacedKey THEME_KEY = new NamespacedKey("bluemaphud", "theme");
     private static final int FORMAT = 3;
-    /** Saved before the clock existed. */
+    /** Saved before the clock and shares existed. */
     private static final int FORMAT_WITHOUT_CLOCK = 2;
     /** Saved before coordinates-only mode existed. */
     private static final int FORMAT_WITHOUT_MODE = 1;
@@ -28,6 +28,8 @@ public final class PlayerSettings {
     /** Shows only the coordinate line, in place of the minimap. */
     public boolean coordsOnly;
     public boolean showClock = true;
+    /** Whether coordinates other players share reach this player. */
+    public boolean receiveShares = true;
     /** The player's own theme, or null for the server's default. */
     public String theme;
 
@@ -45,7 +47,7 @@ public final class PlayerSettings {
         int[] saved = data.get(KEY, PersistentDataType.INTEGER_ARRAY);
         boolean known = saved != null && (saved.length == 10 && saved[0] == FORMAT_WITHOUT_MODE
                 || saved.length == 11 && saved[0] == FORMAT_WITHOUT_CLOCK
-                || saved.length == 12 && saved[0] == FORMAT);
+                || saved.length == 13 && saved[0] == FORMAT);
         if (known) {
             settings.enabled = saved[1] != 0;
             settings.zoom = HudConfig.nearestZoom(saved[2]);
@@ -59,7 +61,10 @@ public final class PlayerSettings {
             // Players saved before modes existed never chose one, so they get the server's default.
             if (saved.length >= 11) settings.coordsOnly = saved[10] != 0;
             // Likewise the clock: on, unless they hid it.
-            if (saved.length >= 12) settings.showClock = saved[11] != 0;
+            if (saved.length >= 13) {
+                settings.showClock = saved[11] != 0;
+                settings.receiveShares = saved[12] != 0;
+            }
         }
         settings.theme = data.get(THEME_KEY, PersistentDataType.STRING);
         return settings;
@@ -68,7 +73,8 @@ public final class PlayerSettings {
     public void save(PersistentDataContainer data) {
         data.set(KEY, PersistentDataType.INTEGER_ARRAY, new int[] {
                 FORMAT, enabled ? 1 : 0, zoom, fullscreenZoom, size, offsetX, offsetY,
-                showCoords ? 1 : 0, showPlayers ? 1 : 0, showMarkers ? 1 : 0, coordsOnly ? 1 : 0, showClock ? 1 : 0
+                showCoords ? 1 : 0, showPlayers ? 1 : 0, showMarkers ? 1 : 0, coordsOnly ? 1 : 0, showClock ? 1 : 0,
+                receiveShares ? 1 : 0
         });
         if (theme == null) data.remove(THEME_KEY);
         else data.set(THEME_KEY, PersistentDataType.STRING, theme);

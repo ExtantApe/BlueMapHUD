@@ -151,12 +151,40 @@ public final class Helper extends JavaPlugin {
                     Runtime runtime = Runtime.getRuntime();
                     say("afterGC usedMB " + (runtime.totalMemory() - runtime.freeMemory()) / 1048576);
                 }
+                case "sharefilter" -> shareFilter(a);
+                case "mkworld" -> { // A second world, in its own world group.
+                    org.bukkit.World world = Bukkit.createWorld(new org.bukkit.WorldCreator(a[1]).type(org.bukkit.WorldType.FLAT));
+                    say("mkworld " + (world != null ? world.getName() : "failed"));
+                }
                 case "execute" -> say("perform " + player(a[1]).performCommand(String.join(" ", Arrays.copyOfRange(a, 2, a.length))));
                 default -> say("unknown " + a[0]);
             }
         } catch (Exception e) {
             say("FAILED " + a[0] + ": " + e);
         }
+    }
+
+    private final org.bukkit.event.Listener shareListener = new org.bukkit.event.Listener() {};
+    private String shareMode = "off";
+
+    /**
+     * sharefilter off | log | cancel | remove <name>: listens to CoordinateShareEvent like a chat rules plugin.
+     * Every share it sees is logged as "BMT share ...".
+     */
+    private void shareFilter(String[] a) {
+        org.bukkit.event.HandlerList.unregisterAll(shareListener);
+        shareMode = a.length > 2 ? a[1] + " " + a[2] : a[1];
+        if (!a[1].equals("off")) {
+            getServer().getPluginManager().registerEvent(com.extantape.bluemaphud.api.CoordinateShareEvent.class, shareListener,
+                    org.bukkit.event.EventPriority.NORMAL, (listener, event) -> {
+                        var share = (com.extantape.bluemaphud.api.CoordinateShareEvent) event;
+                        say("share from " + share.getSender().getName() + " at " + share.getX() + " " + share.getY() + " " + share.getZ()
+                                + " to " + share.getRecipients().stream().map(Player::getName).sorted().toList());
+                        if (shareMode.equals("cancel")) share.setCancelled(true);
+                        if (shareMode.startsWith("remove ")) share.getRecipients().removeIf(p -> p.getName().equals(shareMode.substring(7)));
+                    }, this);
+        }
+        say("sharefilter " + shareMode);
     }
 
     @SuppressWarnings("deprecation") // Deliberately the metadata vanish plugins still set.

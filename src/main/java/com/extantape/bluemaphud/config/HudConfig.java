@@ -11,13 +11,23 @@ import java.util.Map;
 /** An immutable copy of config.yml. A reload builds a new one. */
 public record HudConfig(
         Tiles tiles, Hud hud, Commands commands, Fullscreen fullscreen,
-        Players players, Markers markers, Pack pack
+        Players players, Markers markers, Pack pack, Share share
 ) {
     public static final int[] ZOOM_LEVELS = {1, 2, 4, 8, 16, 32, 64};
     /** In-game minutes between clock changes. See docs/decisions.md for why. */
     public static final int CLOCK_STEP_DEFAULT = 5;
 
     public enum Channel { BOSS_BAR, ACTION_BAR }
+
+    /** Who a share can reach before other plugins filter it. */
+    public enum ShareScope {
+        /** Players in the sender's world, counting its _nether and _the_end as the same world. */
+        WORLD_GROUP,
+        /** Everyone online, for servers whose rules plugin narrows each share through the share event. */
+        ALL_ONLINE
+    }
+
+    public record Share(boolean enabled, ShareScope candidates, int cooldownSeconds, boolean log) {}
 
     public record Tiles(String source, String webRoot, String httpUrl, int refreshMinutes,
                         int cacheChunks, Map<String, String> mapOverrides) {}
@@ -122,7 +132,13 @@ public record HudConfig(
                 c.getBoolean("pack.bedrock-exempt", true),
                 c.getBoolean("pack.re-send-on-removal", true));
 
-        return new HudConfig(tiles, hud, commands, fullscreen, players, markers, pack);
+        Share share = new Share(
+                c.getBoolean("share.enabled", true),
+                "all-online".equalsIgnoreCase(c.getString("share.candidates", "world-group")) ? ShareScope.ALL_ONLINE : ShareScope.WORLD_GROUP,
+                clamp(c.getInt("share.cooldown-seconds", 30), 0, 3600),
+                c.getBoolean("share.log", true));
+
+        return new HudConfig(tiles, hud, commands, fullscreen, players, markers, pack, share);
     }
 
     public static int sizeCells(String name) {

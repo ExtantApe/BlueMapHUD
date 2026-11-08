@@ -11,6 +11,8 @@ import com.extantape.bluemaphud.pack.PackService;
 import com.extantape.bluemaphud.render.HudFonts;
 import com.extantape.bluemaphud.render.IconSet;
 import com.extantape.bluemaphud.render.MapComposer;
+import com.extantape.bluemaphud.share.ShareMenu;
+import com.extantape.bluemaphud.share.ShareService;
 import com.extantape.bluemaphud.theme.Theme;
 import com.extantape.bluemaphud.theme.ThemeSet;
 import com.extantape.bluemaphud.tiles.FileTileSource;
@@ -25,8 +27,10 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.server.ServerLoadEvent;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerResourcePackStatusEvent;
@@ -54,6 +58,8 @@ public final class BlueMapHudPlugin extends JavaPlugin implements Listener {
     private GridCache grid;
     private HudFonts fonts;
     private IconSet icons;
+    private ShareService shares;
+    private ShareMenu shareMenu;
     private final Consumer<BlueMapAPI> onBlueMapEnable = api -> Bukkit.getScheduler().runTask(this, () -> startRendering(api));
     private final Consumer<BlueMapAPI> onBlueMapDisable = api -> Bukkit.getScheduler().runTask(this, this::stopRendering);
 
@@ -63,6 +69,8 @@ public final class BlueMapHudPlugin extends JavaPlugin implements Listener {
         config = HudConfig.from(getConfig());
         packs = new PackService(this, getDataFolder().toPath().resolve("pack"));
         hud = new HudManager(this, packs);
+        shares = new ShareService(this);
+        shareMenu = new ShareMenu(this, shares);
         rebuildPack();
         stopRendering();
 
@@ -89,6 +97,8 @@ public final class BlueMapHudPlugin extends JavaPlugin implements Listener {
 
     public HudConfig config() { return config; }
     public HudManager hud() { return hud; }
+    public ShareService shares() { return shares; }
+    public ShareMenu shareMenu() { return shareMenu; }
     public PackService packs() { return packs; }
 
     /** Re-reads config.yml. Players get the pack again only if its contents changed. */
@@ -248,6 +258,20 @@ public final class BlueMapHudPlugin extends JavaPlugin implements Listener {
             getLogger().log(Level.FINE, "Could not query Floodgate", e);
             return false;
         }
+    }
+
+    /** Once every plugin has started, says if all-online sharing has nothing to filter it. */
+    @EventHandler
+    public void onServerLoad(ServerLoadEvent event) {
+        if (shares.allOnlineWithoutFilter()) {
+            getLogger().warning("share.candidates is all-online, but no plugin filters shares, so they stay within each sender's world group.");
+        }
+    }
+
+    /** A failed pack download gets another try when the player changes world. */
+    @EventHandler
+    public void onChangedWorld(PlayerChangedWorldEvent event) {
+        if (!hud.isBedrock(event.getPlayer())) packs.retryIfFailed(event.getPlayer());
     }
 
     @EventHandler

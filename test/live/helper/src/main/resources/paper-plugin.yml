@@ -9,3 +9,8 @@ dependencies:
       load: BEFORE
       required: true
       join-classpath: true
+    # For the share tests: listens to CoordinateShareEvent the way a server's chat rules plugin would.
+    BlueMapHUD:
+      load: BEFORE
+      required: true
+      join-classpath: true

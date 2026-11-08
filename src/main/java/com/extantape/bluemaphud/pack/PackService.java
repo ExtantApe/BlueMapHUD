@@ -5,6 +5,7 @@ import com.sun.net.httpserver.HttpServer;
 import net.kyori.adventure.resource.ResourcePackInfo;
 import net.kyori.adventure.resource.ResourcePackRequest;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerResourcePackStatusEvent;
@@ -40,6 +41,11 @@ public final class PackService {
     private final Path packFolder;
     private final Set<UUID> loaded = ConcurrentHashMap.newKeySet();
     private final Set<UUID> resent = ConcurrentHashMap.newKeySet();
+    /** Players whose download failed this session, who get the pack offered again on a world change. */
+    private final Set<UUID> failed = ConcurrentHashMap.newKeySet();
+    /** Admins hear about failures at most this often, however many players are affected. */
+    private static final long ADMIN_WARNING_GAP_MILLIS = 5 * 60 * 1000L;
+    private long lastAdminWarning;
     private HudConfig.Pack config;
     private volatile PackBuilder.Built pack;
     private HttpServer server;
@@ -97,6 +103,30 @@ public final class PackService {
     public void forget(Player player) {
         loaded.remove(player.getUniqueId());
         resent.remove(player.getUniqueId());
+        failed.remove(player.getUniqueId());
+    }
+
+    /** Offers the pack again after a failed download. Called when the player changes world; joining sends it anyway. */
+    public void retryIfFailed(Player player) {
+        if (failed.remove(player.getUniqueId()) && player.isOnline()) send(player);
+    }
+
+    private void reportFailure(Player player, PlayerResourcePackStatusEvent.Status status) {
+        if (!player.isOnline()) return;
+        player.sendMessage(Component.text("The map's resource pack couldn't be downloaded, so the map is off for now. "
+                + "It'll try again when you change worlds or rejoin.", NamedTextColor.YELLOW));
+        String reason = status == PlayerResourcePackStatusEvent.Status.INVALID_URL ? "the address was invalid"
+                : status == PlayerResourcePackStatusEvent.Status.FAILED_RELOAD ? "it didn't load" : "the download failed";
+        plugin.getLogger().warning(player.getName() + " didn't get the BlueMapHUD pack: " + reason + ". They're playing without the map."
+                + " Check the pack's hosting; /bmhud pack export shows the address players are sent.");
+        long now = System.currentTimeMillis();
+        if (now - lastAdminWarning < ADMIN_WARNING_GAP_MILLIS) return;
+        lastAdminWarning = now;
+        Component warning = Component.text("[BlueMapHUD] " + player.getName() + " couldn't download the map's pack (" + reason
+                + "). Check the pack's hosting. /bmhud pack export shows the address.", NamedTextColor.GOLD);
+        for (Player admin : Bukkit.getOnlinePlayers()) {
+            if (admin.hasPermission("bluemaphud.admin")) admin.sendMessage(warning);
+        }
     }
 
     public void send(Player player) {
@@ -117,11 +147,22 @@ public final class PackService {
         if (!PACK_ID.equals(event.getID())) return false;
         Player player = event.getPlayer();
         switch (event.getStatus()) {
-            case SUCCESSFULLY_LOADED -> loaded.add(player.getUniqueId());
-            case DECLINED, FAILED_DOWNLOAD, INVALID_URL, FAILED_RELOAD -> {
+            case SUCCESSFULLY_LOADED -> {
+                loaded.add(player.getUniqueId());
+                failed.remove(player.getUniqueId());
+            }
+            case DECLINED -> {
+                // The player said no. That alone follows pack.required.
                 loaded.remove(player.getUniqueId());
                 if (config.required() && !bedrock) {
                     Bukkit.getScheduler().runTask(plugin, () -> player.kick(Component.text(config.kickMessage())));
+                }
+            }
+            case FAILED_DOWNLOAD, INVALID_URL, FAILED_RELOAD -> {
+                // A hosting or network problem is never the player's fault, so they stay, with the HUD off.
+                loaded.remove(player.getUniqueId());
+                if (!bedrock && failed.add(player.getUniqueId())) {
+                    Bukkit.getScheduler().runTask(plugin, () -> reportFailure(player, event.getStatus()));
                 }
             }
             case DISCARDED -> {

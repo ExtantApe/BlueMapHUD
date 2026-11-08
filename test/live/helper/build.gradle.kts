@@ -16,6 +16,7 @@ repositories {
 dependencies {
     compileOnly(rootProject.extra["paperApi"] as String)
     compileOnly(rootProject.extra["blueMapApi"] as String)
+    compileOnly(rootProject) // For CoordinateShareEvent.
 }
 
 tasks.withType<JavaCompile>().configureEach {

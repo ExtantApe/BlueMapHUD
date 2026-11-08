@@ -5,6 +5,7 @@ import com.extantape.bluemaphud.config.HudConfig;
 import com.extantape.bluemaphud.hud.HudManager;
 import com.extantape.bluemaphud.hud.HudSession;
 import com.extantape.bluemaphud.hud.PlayerSettings;
+import com.extantape.bluemaphud.share.ShareService;
 import com.extantape.bluemaphud.theme.Theme;
 import com.extantape.bluemaphud.theme.ThemeSet;
 import com.mojang.brigadier.Command;
@@ -163,12 +164,28 @@ public final class HudCommands {
                                     return builder.buildFuture();
                                 })
                                 .executes(ctx -> withPlayer(ctx, (p, s) -> setTheme(p, s, StringArgumentType.getString(ctx, "name"))))))
+                .then(Commands.literal("share")
+                        .executes(player((p, s) -> plugin.shareMenu().open(p)))
+                        .then(Commands.literal("everyone").executes(player((p, s) -> plugin.shares().share(p, null))))
+                        .then(Commands.argument("players", StringArgumentType.greedyString())
+                                .suggests((ctx, builder) -> {
+                                    if (!(ctx.getSource().getSender() instanceof Player p)) return builder.buildFuture();
+                                    String remaining = builder.getRemaining();
+                                    int cut = Math.max(remaining.lastIndexOf(' '), remaining.lastIndexOf(',')) + 1;
+                                    String typed = remaining.substring(cut).toLowerCase(Locale.ROOT);
+                                    var names = builder.createOffset(builder.getStart() + cut);
+                                    for (Player other : plugin.shares().candidates(p)) {
+                                        if (other.getName().toLowerCase(Locale.ROOT).startsWith(typed)) names.suggest(other.getName());
+                                    }
+                                    return names.buildFuture();
+                                })
+                                .executes(ctx -> withPlayer(ctx, (p, s) -> shareWith(p, StringArgumentType.getString(ctx, "players"))))))
                 .then(Commands.literal("hide")
                         .then(partOption("coords", false)).then(partOption("players", false)).then(partOption("markers", false))
-                        .then(partOption("clock", false)))
+                        .then(partOption("clock", false)).then(partOption("shares", false)))
                 .then(Commands.literal("show")
                         .then(partOption("coords", true)).then(partOption("players", true)).then(partOption("markers", true))
-                        .then(partOption("clock", true)));
+                        .then(partOption("clock", true)).then(partOption("shares", true)));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> sizeOption(String name) {
@@ -198,14 +215,33 @@ public final class HudCommands {
                 case "coords" -> settings.showCoords = visible;
                 case "players" -> settings.showPlayers = visible;
                 case "clock" -> settings.showClock = visible;
+                case "shares" -> settings.receiveShares = visible;
                 default -> settings.showMarkers = visible;
             }
             plugin.hud().saveSettings(p, s);
+            if (part.equals("shares")) {
+                reply(p, visible ? "You'll receive coordinates other players share with you." : "You won't receive coordinates other players share. /hud show shares turns them back on.");
+                return;
+            }
             reply(p, (visible ? "Showing " : "Hiding ") + (part.equals("clock") ? "the clock" : part) + ".");
             if (part.equals("clock") && visible && !plugin.config().hud().clock()) {
                 error(p, "The clock is turned off on this server, so it won't show.");
             }
         }));
+    }
+
+    /** Shares with the players named, separated by spaces or commas. */
+    private void shareWith(Player sender, String names) {
+        List<Player> found = new java.util.ArrayList<>();
+        List<String> missing = new java.util.ArrayList<>();
+        for (String name : names.split("[\\s,]+")) {
+            if (name.isEmpty()) continue;
+            Player player = ShareService.findVisible(sender, name);
+            if (player == null) missing.add(name);
+            else if (!found.contains(player)) found.add(player);
+        }
+        if (!missing.isEmpty()) error(sender, "Nobody called " + String.join(", ", missing) + " is online.");
+        if (!found.isEmpty()) plugin.shares().share(sender, found);
     }
 
     /** Lists the themes, marking the player's own, with each name clickable to switch to it. */
@@ -314,7 +350,8 @@ public final class HudCommands {
         HudManager hud = plugin.hud();
         sender.sendMessage(Component.text("BlueMapHUD", NamedTextColor.AQUA));
         sender.sendMessage(Component.text("Fullscreen map: toggle, or zoom <n|in|out>. Sneak + F also opens it."));
-        sender.sendMessage(Component.text("Minimap: on, off, mode map or coords, zoom, size, offset, corner, theme, hide and show (coords, players, markers, clock)."));
+        sender.sendMessage(Component.text("Minimap: on, off, mode map or coords, zoom, size, offset, corner, theme, hide and show (coords, players, markers, clock, shares)."));
+        sender.sendMessage(Component.text("Share your coordinates: /hud share, /hud share <names> or /hud share everyone."));
         if (sender.hasPermission("bluemaphud.admin")) {
             sender.sendMessage(Component.text("Admin: /bmhud reload, debug, debug dump, debug pattern, pack export."));
             sender.sendMessage(Component.text(hud.debugLine()));

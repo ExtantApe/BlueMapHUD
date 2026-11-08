@@ -98,6 +98,8 @@ markers:
 pack:
   # false means your own merged pack provides the files. See /bmhud pack export.
   send: true
+  # true kicks players who decline the pack, with kick-message. A download that fails never kicks:
+  # the player plays without the map, admins are warned, and it tries again on a world change or rejoin.
   required: true
   kick-message: "This server needs the BlueMapHUD resource pack."
   prompt: "BlueMapHUD draws the map with this small resource pack."
@@ -117,3 +119,16 @@ pack:
   boss-bar-color: pink
   bedrock-exempt: true
   re-send-on-removal: true
+
+share:
+  # /hud share sends a player's coordinates to people they choose. Nothing is ever shared automatically.
+  enabled: true
+  # Who can be offered a share: world-group is players in the sender's world, counting its _nether and
+  # _the_end as the same world. all-online is everyone, for servers whose rules plugin narrows each share
+  # through CoordinateShareEvent; with no such plugin listening it acts like world-group. Players who
+  # turned shares off (/hud hide shares) or lack bluemaphud.share.receive are never offered.
+  candidates: world-group
+  # Seconds a player waits between shares, so it can't be used to spam.
+  cooldown-seconds: 30
+  # Log each share to the console: who sent it, where, and who received it.
+  log: true

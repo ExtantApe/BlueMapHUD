@@ -27,6 +27,12 @@ permissions:
   bluemaphud.seeplayers:
     description: See other players on the map.
     default: true
+  bluemaphud.share.send:
+    description: Share your coordinates with /hud share.
+    default: true
+  bluemaphud.share.receive:
+    description: Receive coordinates other players share.
+    default: true
   bluemaphud.admin:
     description: Use /bmhud reload, debug and pack commands.
     default: op
