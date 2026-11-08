@@ -4,6 +4,7 @@ Owner decisions for BlueMapHUD, newest first.
 
 | Date | Decision | Why |
 | --- | --- | --- |
+| 2026-11-07 | Keep showing other players within 512 blocks for everyone (`players.radius`, `bluemaphud.seeplayers` on by default). | Different groups of players, such as children and adults, never share a world, so a wide radius doesn't show anyone's position to strangers. Vanished, spectating, invisible and BlueMap-hidden players stay hidden. |
 | 2026-11-07 | Keep the name BlueMapHUD, lead the description, README and topics with "minimap", and say it's an unofficial add-on not affiliated with BlueMap's authors. | So people searching for a minimap find it, without implying it's part of BlueMap. |
 | 2026-11-07 | Add the live test kit to the repo, after the 26.x change. | So the live tests can be rerun by anyone, without carrying 1.21.11 paths. |
 | 2026-11-07 | Support Paper 26.1 and newer only: `api-version` 26.1, Java 25, `paper-plugin.yml`. Drop 1.21.11. | Every Minecraft plugin targets 26.1+ and is Paper-only, so there's one platform to test and maintain. |
