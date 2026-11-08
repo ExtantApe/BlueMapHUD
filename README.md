@@ -36,7 +36,8 @@ If BlueMap stores its maps in SQL, set `tiles.source: http`.
 | `/hud size small\|medium\|large` | Sets the size to 24, 32 or 40 cells. |
 | `/hud offset <x> <y>` | Moves the minimap, in GUI pixels from top centre. |
 | `/hud corner left\|right\|center` | Moves it to a rough preset position. |
-| `/hud hide\|show coords\|players\|markers` | Toggles one part of the map. Coordinates show X, Y, Z and facing. |
+| `/hud hide\|show coords\|players\|markers\|clock` | Toggles one part of the map. Coordinates show X, Y, Z and facing; the clock adds the in-game time after them. |
+| `/hud theme`, `/hud theme <name>\|default` | Lists the themes, with yours marked and each one clickable, or switches to one. `default` goes back to the server's. The choice is saved per player. |
 | `/hud mode coords\|map` | `coords` shows only the X, Y, Z and facing line, in the same bar, and works in worlds BlueMap doesn't map. `map` brings the minimap back. Both turn the HUD on, and `/hud mode` alone says which one you have. New players start in `hud.default-mode`, which is `map` unless the config says `coords`. |
 | `/bmhud help` | Shows help. |
 | `/bmhud reload` | Reloads the config, and re-sends the pack if it changed. |
@@ -56,6 +57,31 @@ If another plugin owns a name, BlueMapHUD backs off: `/map` to `/worldmap`, then
 | `bluemaphud.seeplayers` | everyone | Other players on the map. |
 | `bluemaphud.admin` | ops | `/bmhud reload`, `debug` and `pack`. |
 
+## Themes and the clock
+
+A theme sets the HUD's colours, the plate behind the coordinates and the look of the clock. Four are built in:
+
+| Theme | Looks like |
+| --- | --- |
+| `classic` | Today's look: white numbers on a dark plate, with a plain sun and moon. The default. |
+| `desert` | A warm plate and a dune with a cactus, as the sun rises, crosses the sky and sets, and the moon follows. |
+| `galaxy` | A deep purple plate and a small sun on a planet's orbit, read like a clock face with noon at the top. |
+| `high-contrast` | A solid black plate, white and yellow text and the plainest shapes, for low vision and bright screens. |
+
+`hud.theme` in `config.yml` picks the one new players get. Players choose their own with `/hud theme <name>`. Every theme is in the pack, so switching needs no new download.
+
+The clock follows the coordinates as a small picture and 24-hour time, such as `18:30`. It changes every `hud.clock.step-minutes` in-game minutes, 5 by default, and its digits are fixed-width, so the line never shifts. It's hidden where time stands still, such as the Nether and the End. `hud.clock.enabled: false` turns it off for everyone, and `/hud hide clock` for one player.
+
+**Your own theme.** Copy one of the files in [`src/main/resources/themes`](src/main/resources/themes) into `plugins/BlueMapHUD/themes/`, rename it (lowercase, such as `ocean.json`), change it, and run `/bmhud reload`. A file with a built-in theme's name replaces it. The file holds:
+
+- `name`: the name players see.
+- `colors`: `text`, `facing`, `time` and `legend` for text, `plate` for the plate, and `self`, `player`, `poi`, `death` and `north` for the map's icons. Each is `#RRGGBB`.
+- `plate-opacity`: from 26 to 255. 255 is solid.
+- `clock.palette`: one character per colour. `.` is transparent.
+- `clock.frames`: 1 to 24 pictures, 9 rows of 9 characters each. They share the day evenly from 00:00, so 8 frames change every 3 hours.
+
+Up to 8 themes fit in the pack. Every built-in theme passes the same readability test, and the plugin warns about one of yours that doesn't. Text needs a WCAG contrast of 4.5:1 against the plate, and three quarters of each clock picture needs 3:1. Both are checked over ten backgrounds from white to black, including the brightest pure colours. A theme that fails still loads, so you can fix it.
+
 ## Resource packs
 
 The plugin sends its pack alongside any others using the multi-pack API, and players don't see a map until their client confirms it loaded. Its only file outside its own namespace is a transparent boss bar texture, in pink by default. If another pack restyles that colour, set `pack.boss-bar-color` to one it leaves alone.
@@ -72,6 +98,7 @@ The plugin sends its pack alongside any others using the multi-pack API, and pla
 
 - **Screen position:** the server can't see a player's screen size, so the map starts at top centre. Players can move it with `/hud offset` or `/hud corner`.
 - **Other boss bars:** the minimap hides for Adventure boss bars, registered Bukkit bars and the Wither and Ender Dragon. A bar made with Bukkit's unregistered `createBossBar` can't be detected, so the minimap stays up and the two share the screen.
+- **Clock:** it shows the in-game time of the world you're in, in steps of `hud.clock.step-minutes`. It doesn't show in worlds where time stands still.
 - **Coordinates:** the coordinate line is part of the minimap, so it hides whenever the minimap does, including during boss fights and with `/hud off`. In `/hud mode coords` it follows the same rules, apart from also showing where BlueMap has no map. The fullscreen map always shows it.
 - **Vertical position:** `/hud offset y` moves in whole map cells, up to `hud.max-offset-y`.
 - **Action bar mode:** the map sits above the hotbar and can flicker if another plugin also uses the action bar. The fullscreen map still uses a boss bar.

@@ -7,6 +7,8 @@ import com.extantape.bluemaphud.render.HudIcon;
 import com.extantape.bluemaphud.render.IconSet;
 import com.extantape.bluemaphud.render.ReadoutFont;
 import com.extantape.bluemaphud.render.TinyFont;
+import com.extantape.bluemaphud.theme.Theme;
+import com.extantape.bluemaphud.theme.ThemeSet;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
@@ -36,12 +38,11 @@ public final class PackBuilder {
     private static final int SHEET_COLUMNS = 16;
     private static final long FIXED_ZIP_TIME = 1_000_000_000_000L;
     private static final int RUN_CELL_WIDTH = FontLayout.MAX_RUN;
-    /** The plate behind text: about half transparent, tinted black by the frame. */
     /**
-     * The plate is tinted black and about 69% opaque: the lightest plate that keeps both the white numbers
-     * and the dimmer facing above a 4.5:1 contrast ratio even over pure white, while the map still shows faintly.
+     * Below the text shader's 10% cut-off, so never drawn, but the client still counts it when it measures a
+     * glyph. It gives the clock digits and pictures fixed widths.
      */
-    private static final int PLATE_PIXEL = 0xB0FFFFFF;
+    private static final int WIDTH_MARKER = 0x14FFFFFF;
     private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().create();
 
     public record Built(byte[] zip, String sha1Hex, byte[] sha1) {}
@@ -51,8 +52,8 @@ public final class PackBuilder {
     public static Built build(HudConfig config, HudFonts fonts, IconSet icons) throws IOException {
         Map<String, byte[]> files = new LinkedHashMap<>();
         files.put("pack.mcmeta", packMeta());
-        addLayout(files, fonts.minimap, icons);
-        addLayout(files, fonts.fullscreen, icons);
+        addLayout(files, fonts.minimap, icons, fonts.themes);
+        addLayout(files, fonts.fullscreen, icons, fonts.themes);
         if (config.pack().hideBossBar()) {
             byte[] blank = png(new BufferedImage(182, 5, BufferedImage.TYPE_INT_ARGB));
             String color = config.pack().bossBarColor();
@@ -74,7 +75,7 @@ public final class PackBuilder {
         return GSON.toJson(root).getBytes(StandardCharsets.UTF_8);
     }
 
-    private static void addLayout(Map<String, byte[]> files, FontLayout layout, IconSet icons) throws IOException {
+    private static void addLayout(Map<String, byte[]> files, FontLayout layout, IconSet icons, ThemeSet themes) throws IOException {
         String name = layout.name();
         int runCells = FontLayout.paddedCells(layout.maxMapAscent(), layout.step(), 1);
         int iconCells = FontLayout.paddedCells(layout.maxIconAscent(), 1, HudIcon.SIZE);
@@ -86,7 +87,12 @@ public final class PackBuilder {
         int readoutCells = FontLayout.paddedCells(layout.maxReadoutAscent(), 1, ReadoutFont.HEIGHT);
         int plateCells = FontLayout.paddedCells(layout.maxPlateAscent(), 1, FontLayout.PLATE_HEIGHT);
         files.put("assets/bluemaphud/textures/font/" + name + "_readout.png", png(readoutSheet(readoutCells)));
-        files.put("assets/bluemaphud/textures/font/" + name + "_plate.png", png(plateSheet(plateCells)));
+        // One plate sheet for each opacity the themes use. The colour comes from the frame.
+        for (int v = 0; v < themes.plateOpacities().size(); v++) {
+            files.put("assets/bluemaphud/textures/font/" + name + "_plate" + v + ".png", png(plateSheet(plateCells, themes.plateOpacities().get(v))));
+        }
+        int clockCells = FontLayout.paddedCells(layout.maxClockAscent(), 1, Theme.CLOCK_SIZE);
+        files.put("assets/bluemaphud/textures/font/" + name + "_clock.png", png(clockSheet(themes, clockCells)));
 
         JsonArray providers = new JsonArray();
         providers.add(spaceProvider());
@@ -102,9 +108,18 @@ public final class PackBuilder {
                     sheetRows(TinyFont.glyphCount(), i -> layout.textChar(r, i))));
             providers.add(bitmap(name + "_readout", readoutCells, layout.readoutAscent(row),
                     sheetRows(ReadoutFont.glyphCount(), i -> layout.readoutChar(r, i))));
-            String[] plates = new String[FontLayout.PLATE_LENGTHS];
-            for (int i = 0; i < plates.length; i++) plates[i] = new String(Character.toChars(layout.plateChar(row, i)));
-            providers.add(bitmap(name + "_plate", plateCells, layout.plateAscent(row), plates));
+            // Every row gets the first plate style, as before. The rest, and the clock, only where the
+            // coordinate line can be.
+            boolean readout = layout.readoutRow(row);
+            for (int v = 0; v < (readout ? themes.plateOpacities().size() : 1); v++) {
+                String[] plates = new String[FontLayout.PLATE_LENGTHS];
+                for (int i = 0; i < plates.length; i++) plates[i] = new String(Character.toChars(layout.plateChar(row, v, i)));
+                providers.add(bitmap(name + "_plate" + v, plateCells, layout.plateAscent(row), plates));
+            }
+            if (readout) {
+                providers.add(bitmap(name + "_clock", clockCells, layout.clockAscent(row),
+                        sheetRows(themes.clockGlyphs(), i -> layout.clockChar(r, i))));
+            }
         }
         JsonObject font = new JsonObject();
         font.add("providers", providers);
@@ -203,16 +218,45 @@ public final class PackBuilder {
                     if (ReadoutFont.pixel(glyph, x, y)) image.setRGB(originX + x, originY + y, 0xFFFFFFFF);
                 }
             }
+            int marker = ReadoutFont.widthMarkerRow(glyph);
+            if (marker >= 0) image.setRGB(originX + ReadoutFont.WIDTH - 1, originY + marker, WIDTH_MARKER);
+        }
+        return image;
+    }
+
+    /** Every theme's clock frames in order, in their own colours, each measured at the full width. */
+    private static BufferedImage clockSheet(ThemeSet themes, int cellHeight) {
+        int count = Math.max(1, themes.clockGlyphs());
+        int size = Theme.CLOCK_SIZE;
+        int rows = (count + SHEET_COLUMNS - 1) / SHEET_COLUMNS;
+        BufferedImage image = new BufferedImage(size * SHEET_COLUMNS, cellHeight * rows, BufferedImage.TYPE_INT_ARGB);
+        int glyph = 0;
+        for (Theme theme : themes.themes()) {
+            for (int[] frame : theme.clockFrames()) {
+                int originX = glyph % SHEET_COLUMNS * size, originY = glyph / SHEET_COLUMNS * cellHeight;
+                boolean lastColumnLit = false;
+                for (int y = 0; y < size; y++) {
+                    for (int x = 0; x < size; x++) {
+                        int argb = frame[y * size + x];
+                        if (argb >>> 24 == 0) continue;
+                        image.setRGB(originX + x, originY + y, argb);
+                        if (x == size - 1) lastColumnLit = true;
+                    }
+                }
+                if (!lastColumnLit) image.setRGB(originX + size - 1, originY + size - 1, WIDTH_MARKER);
+                glyph++;
+            }
         }
         return image;
     }
 
     /** One column of cells. Row {@code i} is a plate {@code 2^i} pixels wide, with padding below. */
-    private static BufferedImage plateSheet(int cellHeight) {
+    private static BufferedImage plateSheet(int cellHeight, int opacity) {
+        int pixel = opacity << 24 | 0xFFFFFF;
         BufferedImage image = new BufferedImage(1 << (FontLayout.PLATE_LENGTHS - 1), cellHeight * FontLayout.PLATE_LENGTHS, BufferedImage.TYPE_INT_ARGB);
         for (int i = 0; i < FontLayout.PLATE_LENGTHS; i++) {
             for (int y = 0; y < FontLayout.PLATE_HEIGHT; y++) {
-                for (int x = 0; x < 1 << i; x++) image.setRGB(x, i * cellHeight + y, PLATE_PIXEL);
+                for (int x = 0; x < 1 << i; x++) image.setRGB(x, i * cellHeight + y, pixel);
             }
         }
         return image;

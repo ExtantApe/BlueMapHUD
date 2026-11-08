@@ -35,6 +35,16 @@ hud:
   # What new players see: map, or coords for only the X, Y, Z and facing line.
   # Players can switch with /hud mode, and their choice is saved.
   default-mode: map
+  # Colours, plate and clock style for new players: classic, galaxy, desert or high-contrast, or a theme
+  # of your own in plugins/BlueMapHUD/themes/. Players can choose their own with /hud theme.
+  theme: classic
+  clock:
+    # A small clock and the in-game time after the coordinates, in 24-hour time. It's hidden where time
+    # stands still, such as the Nether. Players can hide it with /hud hide clock.
+    enabled: true
+    # In-game minutes between clock changes, rounded up to divide the hour: 1, 2, 3, 4, 5, 6, 10, 12, 15,
+    # 20, 30 or 60. An in-game minute is under a second, so small steps send more updates while players stand still.
+    step-minutes: 5
   # Rounds colours to this step so runs get longer and packets get smaller.
   color-step: 8
   # Shown where BlueMap has no tile yet.

@@ -141,12 +141,22 @@ final class SimulatedClient {
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
                 int sx = glyph.cellX + (int) (x / glyph.scale), sy = glyph.cellY + (int) (y / glyph.scale);
-                int alpha = glyph.sheet.getRGB(sx, sy) >>> 24;
+                int texel = glyph.sheet.getRGB(sx, sy), alpha = texel >>> 24;
                 if (alpha < 26) continue; // The text shader discards anything under 0.1.
                 int px = left + x, py = top + y;
-                if (px >= 0 && py >= 0 && px < image.getWidth() && py < image.getHeight()) image.setRGB(px, py, 0xFF000000 | mix(image.getRGB(px, py), color, alpha));
+                // The shader multiplies the texture's colour by the text colour, so white glyphs take the text colour.
+                int tinted = multiply(texel, color);
+                if (px >= 0 && py >= 0 && px < image.getWidth() && py < image.getHeight()) image.setRGB(px, py, 0xFF000000 | mix(image.getRGB(px, py), tinted, alpha));
             }
         }
+    }
+
+    private static int multiply(int texel, int color) {
+        int result = 0;
+        for (int shift = 0; shift <= 16; shift += 8) {
+            result |= ((texel >> shift & 255) * (color >> shift & 255) / 255) << shift;
+        }
+        return result;
     }
 
     private static int mix(int under, int over, int alpha) {

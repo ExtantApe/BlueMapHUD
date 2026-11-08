@@ -11,6 +11,8 @@ import com.extantape.bluemaphud.pack.PackService;
 import com.extantape.bluemaphud.render.HudFonts;
 import com.extantape.bluemaphud.render.IconSet;
 import com.extantape.bluemaphud.render.MapComposer;
+import com.extantape.bluemaphud.theme.Theme;
+import com.extantape.bluemaphud.theme.ThemeSet;
 import com.extantape.bluemaphud.tiles.FileTileSource;
 import com.extantape.bluemaphud.tiles.GridCache;
 import com.extantape.bluemaphud.tiles.HttpTileSource;
@@ -103,7 +105,12 @@ public final class BlueMapHudPlugin extends JavaPlugin implements Listener {
         }
     }
 
-    public String debugLine() {
+    /** The themes in the current pack. */
+    public ThemeSet themes() {
+        return fonts.themes;
+    }
+
+        public String debugLine() {
         String tiles = grid == null ? "BlueMap unavailable" : grid.cachedChunks() + " chunks and " + grid.cachedTiles() + " tiles cached";
         return tiles + "; " + hud.debugLine() + "; pack " + packs.sha1() + ", public-url " + packs.publicUrlStatus();
     }
@@ -177,7 +184,10 @@ public final class BlueMapHudPlugin extends JavaPlugin implements Listener {
     }
 
     private boolean rebuildPack() {
-        fonts = new HudFonts(config);
+        ThemeSet themes = ThemeSet.load(getDataFolder().toPath().resolve("themes"), config.hud().theme(), getLogger()::warning);
+        fonts = new HudFonts(config, themes);
+        getLogger().info("Themes: " + String.join(", ", themes.themes().stream().map(Theme::id).toList())
+                + ". New players get " + themes.defaultTheme().id() + ".");
         Path iconFolder = getDataFolder().toPath().resolve("icons");
         try {
             Files.createDirectories(iconFolder);

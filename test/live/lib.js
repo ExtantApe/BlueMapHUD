@@ -131,7 +131,7 @@ function readPng(data) {
 }
 
 // ---- Pack and frame decoding ----
-const TINY = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-.,:/+'()_?", READOUT = '0123456789-NESW';
+const TINY = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-.,:/+'()_?", READOUT = '0123456789-NESW:0123456789'; // Then the clock's fixed-width digits.
 const NAMED = { black: 0, dark_blue: 0xAA, dark_green: 0xAA00, dark_aqua: 0xAAAA, dark_red: 0xAA0000, dark_purple: 0xAA00AA, gold: 0xFFAA00, gray: 0xAAAAAA, dark_gray: 0x555555, blue: 0x5555FF, green: 0x55FF55, aqua: 0x55FFFF, red: 0xFF5555, light_purple: 0xFF55FF, yellow: 0xFFFF55, white: 0xFFFFFF };
 function unzipAll(zipPath) {
   const names = cp.execFileSync('unzip', ['-Z1', zipPath], { encoding: 'utf8', maxBuffer: 1 << 26 }).trim().split('\n');
@@ -159,7 +159,8 @@ class Pack {
       const sheet = sheets[file] || (sheets[file] = readPng(this.files[file]));
       const rows = p.chars.map((s) => [...s]), cols = rows[0].length;
       const cw = sheet.w / cols, ch = sheet.h / rows.length, scale = p.height / ch;
-      const kind = /_runs\.png$/.test(file) ? 'run' : /_icons\.png$/.test(file) ? 'icon' : /_readout\.png$/.test(file) ? 'read' : /_plate\.png$/.test(file) ? 'plate' : 'text';
+      const kind = /_runs\.png$/.test(file) ? 'run' : /_icons\.png$/.test(file) ? 'icon' : /_readout\.png$/.test(file) ? 'read'
+        : /_plate\d*\.png$/.test(file) ? 'plate' : /_clock\.png$/.test(file) ? 'clock' : 'text';
       rows.forEach((row, r) => row.forEach((c, i) => {
         if (c.codePointAt(0) === 0) return;
         let lit = 0;
@@ -185,7 +186,7 @@ function decodeFrame(title, pack) {
   const root = plainNbt(title);
   if (!root || !root.font) return { empty: true, root };
   const font = pack.fonts[root.font.split(':')[1]];
-  const f = { fontName: root.font, shadow: root.shadow_color, runs: [], icons: [], text: [], plates: [], net: 0, missing: 0, spans: (root.extra || []).length };
+  const f = { fontName: root.font, shadow: root.shadow_color, runs: [], icons: [], text: [], plates: [], clocks: [], net: 0, missing: 0, spans: (root.extra || []).length };
   let x = 0;
   for (const s of root.extra || []) {
     const col = s.color, rgb = col === undefined ? 0xFFFFFF : col in NAMED ? NAMED[col] : parseInt(col.slice(1), 16);
@@ -197,6 +198,7 @@ function decodeFrame(title, pack) {
       if (g.kind === 'text') f.text.push({ ch: TINY[g.index], x, top: 7 - g.ascent, color: rgb, adv: g.advance });
       if (g.kind === 'read') f.text.push({ ch: READOUT[g.index], x, top: 7 - g.ascent, color: rgb, adv: g.advance, readout: true });
       if (g.kind === 'plate') f.plates.push({ x, top: 7 - g.ascent, width: g.width, color: rgb });
+      if (g.kind === 'clock') f.clocks.push({ index: g.index, x, top: 7 - g.ascent });
       x += g.advance;
     }
   }

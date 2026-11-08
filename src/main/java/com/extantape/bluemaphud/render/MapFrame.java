@@ -97,13 +97,18 @@ public final class MapFrame {
      * text it sits behind. The width is rounded to a whole number of plate glyphs.
      */
     public void drawPlate(int pixelX, int width, int gridRow) {
+        drawPlate(pixelX, width, gridRow, 0, 0x000000);
+    }
+
+    /** Draws a plate in one of the themes' opacities ({@code variant}) and colours. */
+    public void drawPlate(int pixelX, int width, int gridRow, int variant, int color) {
         int row = Math.min(layout.rows() - 1, layout.rowFor(gridRow, height, offsetRows));
         moveTo(left + pixelX);
-        setColor(0);
+        setColor(color);
         for (int remaining = width; remaining > 0; ) {
             int index = FontLayout.PLATE_LENGTHS - 1;
             while ((1 << index) > remaining) index--;
-            pending.appendCodePoint(layout.plateChar(row, index));
+            pending.appendCodePoint(layout.plateChar(row, variant, index));
             pending.appendCodePoint(FontLayout.spaceChar(true, 0));
             remaining -= 1 << index;
             cursor += 1 << index;
@@ -124,6 +129,36 @@ public final class MapFrame {
                 pending.appendCodePoint(layout.readoutChar(row, glyph));
                 cursor += ReadoutFont.advance(glyph);
             }
+        }
+        return cursor - left;
+    }
+
+    /** Every clock glyph advances this far: the picture plus the client's pixel of spacing. */
+    public static final int CLOCK_ADVANCE = 10;
+
+    /**
+     * Draws a clock frame with its own colours, top-left one pixel above the readout line. Returns the pixel
+     * after it.
+     */
+    public int drawClock(int clockGlyph, int pixelX, int gridRow) {
+        int row = Math.min(layout.rows() - 1, layout.rowFor(gridRow, height, offsetRows));
+        moveTo(left + pixelX);
+        setColor(0xFFFFFF); // White leaves the picture's own colours as they are.
+        pending.appendCodePoint(layout.clockChar(row, clockGlyph));
+        cursor += CLOCK_ADVANCE;
+        return cursor - left;
+    }
+
+    /** Draws a time such as "18:30" in fixed-width digits, so it never shifts as it changes. Returns the pixel after it. */
+    public int drawTime(String time, int pixelX, int gridRow, int color) {
+        int row = Math.min(layout.rows() - 1, layout.rowFor(gridRow, height, offsetRows));
+        moveTo(left + pixelX);
+        setColor(color);
+        for (int i = 0; i < time.length(); i++) {
+            char c = time.charAt(i);
+            int glyph = c >= '0' && c <= '9' ? ReadoutFont.tabular(c) : ReadoutFont.index(c);
+            pending.appendCodePoint(layout.readoutChar(row, glyph));
+            cursor += ReadoutFont.advance(glyph);
         }
         return cursor - left;
     }

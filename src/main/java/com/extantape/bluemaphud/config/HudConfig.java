@@ -14,6 +14,8 @@ public record HudConfig(
         Players players, Markers markers, Pack pack
 ) {
     public static final int[] ZOOM_LEVELS = {1, 2, 4, 8, 16, 32, 64};
+    /** In-game minutes between clock changes. See docs/decisions.md for why. */
+    public static final int CLOCK_STEP_DEFAULT = 5;
 
     public enum Channel { BOSS_BAR, ACTION_BAR }
 
@@ -23,7 +25,7 @@ public record HudConfig(
     public record Hud(boolean enabledByDefault, Channel channel, int updateTicks, int size, int zoom,
                       int cellPixels, int offsetX, int offsetY, int maxOffsetY, int cornerX, boolean coords, boolean coordsOnlyByDefault,
                       int colorStep, int voidColor, boolean hideWhileFullscreen, boolean hideForOtherBossBar,
-                      boolean hideInSpectator, boolean quickHideGesture) {}
+                      boolean hideInSpectator, boolean quickHideGesture, String theme, boolean clock, int clockStepMinutes) {}
 
     public record Commands(List<String> mapNames, List<String> hudNames) {}
 
@@ -72,7 +74,10 @@ public record HudConfig(
                 c.getBoolean("hud.auto-hide.while-fullscreen", true),
                 c.getBoolean("hud.auto-hide.other-boss-bar", true),
                 c.getBoolean("hud.auto-hide.spectator", true),
-                c.getBoolean("hud.auto-hide.quick-hide-gesture", false));
+                c.getBoolean("hud.auto-hide.quick-hide-gesture", false),
+                c.getString("hud.theme", "classic").toLowerCase(Locale.ROOT),
+                c.getBoolean("hud.clock.enabled", true),
+                clockStep(c.getInt("hud.clock.step-minutes", CLOCK_STEP_DEFAULT)));
 
         Commands commands = new Commands(
                 nonEmpty(c.getStringList("commands.map-names"), List.of("map", "worldmap")),
@@ -165,5 +170,13 @@ public record HudConfig(
 
     private static int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(max, value));
+    }
+
+    /** A step that divides the hour evenly, so the clock always shows round times such as 18:30. */
+    static int clockStep(int minutes) {
+        for (int step : new int[] {1, 2, 3, 4, 5, 6, 10, 12, 15, 20, 30, 60}) {
+            if (step >= minutes) return step;
+        }
+        return 60;
     }
 }

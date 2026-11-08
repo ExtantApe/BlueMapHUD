@@ -9,6 +9,8 @@ import com.extantape.bluemaphud.render.MapComposer;
 import com.extantape.bluemaphud.render.MapFrame;
 import com.extantape.bluemaphud.render.ReadoutFont;
 import com.extantape.bluemaphud.render.TinyFont;
+import com.extantape.bluemaphud.theme.Theme;
+import com.extantape.bluemaphud.theme.ThemeSet;
 import net.kyori.adventure.text.Component;
 
 import java.util.Arrays;
@@ -17,14 +19,11 @@ import java.util.Locale;
 
 /** Turns a snapshot into a state key and, when that key changes, a frame. Safe off the main thread. */
 public final class FrameBuilder {
-    private static final int COLOR_PLAYER = 0x66D9FF;
-    private static final int COLOR_SELF = 0xFFFFFF;
-    private static final int COLOR_POI = 0xFFC845;
-    private static final int COLOR_DEATH = 0xFF5B5B;
-    private static final int COLOR_TEXT = 0xFFFFFF;
-    private static final int COLOR_DIM = 0xBEC6D2;
     /** Pixels between a plate's edge and its text. */
     private static final int PLATE_PADDING = 3;
+    /** Pixels between the facing and the clock, and between the clock and the time. */
+    private static final int CLOCK_GAP = 3;
+    private static final int TIME_GAP = 1;
     private static final String[] COMPASS = {"N", "NE", "E", "SE", "S", "SW", "W", "NW"};
 
     private final HudConfig config;
@@ -32,6 +31,7 @@ public final class FrameBuilder {
     private final int[] iconAdvances;
     private final MapComposer composer;
     private final MarkerService markers;
+    private final ThemeSet themes;
 
     public record Built(Component component, long estimatedBytes) {}
 
@@ -41,10 +41,14 @@ public final class FrameBuilder {
         this.iconAdvances = iconAdvances;
         this.composer = composer;
         this.markers = markers;
+        this.themes = fonts.themes;
     }
+
+    public ThemeSet themes() { return themes; }
 
     private int width(Snapshot s) { return s.fullscreen() ? config.fullscreen().width() : s.size(); }
     private int height(Snapshot s) { return s.fullscreen() ? config.fullscreen().height() : s.size(); }
+    private int themeIndex(Snapshot s) { return Math.floorMod(s.theme(), themes.size()); }
 
     /** A number that stays the same exactly when a new frame would look the same. */
     public long stateKey(Snapshot s) {
@@ -56,11 +60,14 @@ public final class FrameBuilder {
             key = key * 31 + compassIndex(s.yaw());
             key = key * 31 + s.offsetX();
             key = key * 31 + s.offsetY();
+            key = key * 31 + themeIndex(s);
+            key = key * 31 + s.clockMinutes();
             return key;
         }
         int bpc = s.zoom();
         int width = width(s), height = height(s);
         int cellX = Math.floorDiv(s.blockX(), bpc), cellZ = Math.floorDiv(s.blockZ(), bpc);
+        boolean readout = s.showCoords() || s.fullscreen();
         long key = s.mapId().hashCode();
         key = key * 31 + (s.fullscreen() ? 1 : 0);
         key = key * 31 + (s.pattern() ? 1 : 0);
@@ -71,8 +78,10 @@ public final class FrameBuilder {
         key = key * 31 + HudIcon.headingForYaw(s.yaw());
         key = key * 31 + s.offsetX();
         key = key * 31 + s.offsetY();
-        key = key * 31 + (s.showCoords() || s.fullscreen() ? (s.blockX() * 31L + s.blockY()) * 31L + s.blockZ() : 0);
+        key = key * 31 + (readout ? (s.blockX() * 31L + s.blockY()) * 31L + s.blockZ() : 0);
         key = key * 31 + (s.showMarkers() ? 1 : 0);
+        key = key * 31 + themeIndex(s);
+        key = key * 31 + (readout ? s.clockMinutes() : -1);
         for (int i = 0; i < s.otherPlayers().length; i++) {
             key = key * 31 + Math.floorDiv(s.otherPlayers()[i], bpc);
         }
@@ -89,6 +98,7 @@ public final class FrameBuilder {
         if (s.coordsOnly()) return buildCoordsOnly(s);
         boolean full = s.fullscreen();
         FontLayout layout = full ? fonts.fullscreen : fonts.minimap;
+        Theme.Colors colors = themes.get(themeIndex(s)).colors();
         int width = width(s), height = height(s);
         int bpc = s.zoom();
         int centerCellX = Math.floorDiv(s.blockX(), bpc), centerCellZ = Math.floorDiv(s.blockZ(), bpc);
@@ -102,29 +112,29 @@ public final class FrameBuilder {
         frame.drawGrid(grid);
 
         // North marker in the top-left corner of the map.
-        frame.drawIcon(HudIcon.NORTH, 4 / layout.step() + 1, 4 / layout.step() + 1, COLOR_TEXT);
+        frame.drawIcon(HudIcon.NORTH, 4 / layout.step() + 1, 4 / layout.step() + 1, colors.north());
 
         int count = 0;
         if (s.showMarkers() && !s.pattern()) {
             List<MarkerService.Poi> pois = markers.pois(s.mapId());
             for (MarkerService.Poi poi : pois) {
-                count += placeMarker(frame, layout, poi.x(), poi.z(), HudIcon.POI, COLOR_POI, config.markers().edgeArrows(),
-                        full ? poi.label() : null, firstX, firstZ, width, height, bpc);
+                count += placeMarker(frame, layout, poi.x(), poi.z(), HudIcon.POI, colors.poi(), config.markers().edgeArrows(),
+                        full ? poi.label() : null, colors.text(), firstX, firstZ, width, height, bpc);
             }
             int[] death = s.death();
             if (death != null) {
-                count += placeMarker(frame, layout, death[0], death[1], HudIcon.DEATH, COLOR_DEATH, config.markers().edgeArrows(),
-                        null, firstX, firstZ, width, height, bpc);
+                count += placeMarker(frame, layout, death[0], death[1], HudIcon.DEATH, colors.death(), config.markers().edgeArrows(),
+                        null, colors.text(), firstX, firstZ, width, height, bpc);
             }
         }
 
         int[] others = s.otherPlayers();
         for (int i = 0; i + 1 < others.length; i += 2) {
-            placeMarker(frame, layout, others[i], others[i + 1], HudIcon.PLAYER, COLOR_PLAYER, config.players().edgeArrows(),
-                    null, firstX, firstZ, width, height, bpc);
+            placeMarker(frame, layout, others[i], others[i + 1], HudIcon.PLAYER, colors.player(), config.players().edgeArrows(),
+                    null, colors.text(), firstX, firstZ, width, height, bpc);
         }
 
-        frame.drawIcon(HudIcon.headingForYaw(s.yaw()), width / 2, height / 2, COLOR_SELF);
+        frame.drawIcon(HudIcon.headingForYaw(s.yaw()), width / 2, height / 2, colors.self());
 
         int textRow = height + HudFonts.readoutRowOffset(layout);
         if (full || s.showCoords()) drawReadout(frame, s, width * layout.step(), textRow);
@@ -143,14 +153,14 @@ public final class FrameBuilder {
 
     /** Draws a marker if it's on the map, or an arrow on the edge pointing at it. Returns 1 if it drew. */
     private int placeMarker(MapFrame frame, FontLayout layout, int blockX, int blockZ, int icon, int color, boolean edgeArrow,
-                            String label, int firstX, int firstZ, int width, int height, int bpc) {
+                            String label, int labelColor, int firstX, int firstZ, int width, int height, int bpc) {
         int x = Math.floorDiv(blockX, bpc) - firstX;
         int z = Math.floorDiv(blockZ, bpc) - firstZ;
         if (x >= 0 && z >= 0 && x < width && z < height) {
             frame.drawIcon(icon, x, z, color);
             if (label != null && !label.isEmpty()) {
                 String text = label.toUpperCase(Locale.ROOT);
-                frame.drawText(text, (x + 3) * layout.step(), z, COLOR_TEXT);
+                frame.drawText(text, (x + 3) * layout.step(), z, labelColor);
             }
             return 1;
         }
@@ -161,26 +171,45 @@ public final class FrameBuilder {
         return 1;
     }
 
-    /** Draws "X Y Z facing", centred under the map on a plate. */
+    /** Draws "X Y Z facing", then the clock and the time if shown, centred under the map on a plate. */
     private void drawReadout(MapFrame frame, Snapshot s, int mapWidth, int textRow) {
+        int index = themeIndex(s);
+        Theme theme = themes.get(index);
+        Theme.Colors colors = theme.colors();
         String position = s.blockX() + " " + s.blockY() + " " + s.blockZ() + " ";
         String facing = compass(s.yaw());
+        boolean clock = s.clockMinutes() >= 0;
+        String time = clock ? time(s.clockMinutes()) : "";
         int width = ReadoutFont.width(position + facing);
+        if (clock) width += CLOCK_GAP + MapFrame.CLOCK_ADVANCE + TIME_GAP + ReadoutFont.timeWidth(time);
         int x = (mapWidth - width) / 2;
-        frame.drawPlate(x - PLATE_PADDING, width - 1 + PLATE_PADDING * 2, textRow);
-        int end = frame.drawReadout(position, x, textRow, COLOR_TEXT);
-        frame.drawReadout(facing, end, textRow, COLOR_DIM);
+        frame.drawPlate(x - PLATE_PADDING, width - 1 + PLATE_PADDING * 2, textRow, themes.plateVariant(index), colors.plate());
+        int end = frame.drawReadout(position, x, textRow, colors.text());
+        end = frame.drawReadout(facing, end, textRow, colors.facing());
+        if (clock) {
+            end = frame.drawClock(themes.clockOffset(index) + theme.clockFrame(s.clockMinutes()), end + CLOCK_GAP, textRow);
+            frame.drawTime(time, end + TIME_GAP, textRow, colors.time());
+        }
+    }
+
+    /** 24-hour time, such as "07:05". */
+    public static String time(int minutes) {
+        int m = Math.floorMod(minutes, Theme.MINUTES_PER_DAY);
+        return String.format("%02d:%02d", m / 60, m % 60);
     }
 
     /** Draws the zoom at the left of the map, and the counts at the right, on plates of their own. */
     private void drawLegend(MapFrame frame, Snapshot s, int mapWidth, int players, int markerCount, int textRow) {
+        int index = themeIndex(s);
+        Theme.Colors colors = themes.get(index).colors();
+        int variant = themes.plateVariant(index);
         String zoom = "1:" + s.zoom();
         String counts = "PLAYERS " + players + "  MARKERS " + markerCount;
-        frame.drawPlate(0, TinyFont.width(zoom) - 1 + PLATE_PADDING * 2, textRow);
-        frame.drawText(zoom, PLATE_PADDING, textRow, COLOR_DIM);
+        frame.drawPlate(0, TinyFont.width(zoom) - 1 + PLATE_PADDING * 2, textRow, variant, colors.plate());
+        frame.drawText(zoom, PLATE_PADDING, textRow, colors.legend());
         int countsWidth = TinyFont.width(counts) - 1 + PLATE_PADDING * 2;
-        frame.drawPlate(mapWidth - countsWidth, countsWidth, textRow);
-        frame.drawText(counts, mapWidth - countsWidth + PLATE_PADDING, textRow, COLOR_DIM);
+        frame.drawPlate(mapWidth - countsWidth, countsWidth, textRow, variant, colors.plate());
+        frame.drawText(counts, mapWidth - countsWidth + PLATE_PADDING, textRow, colors.legend());
     }
 
     private static String compass(float yaw) {

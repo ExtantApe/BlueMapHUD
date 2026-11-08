@@ -1,6 +1,7 @@
 package com.extantape.bluemaphud.render;
 
 import com.extantape.bluemaphud.config.HudConfig;
+import com.extantape.bluemaphud.theme.ThemeSet;
 
 /** The fonts a given config needs. The pack is generated from the same object that draws the map. */
 public final class HudFonts {
@@ -17,8 +18,17 @@ public final class HudFonts {
     public final FontLayout minimap;
     public final FontLayout fullscreen;
     public final int maxOffsetRows;
+    /** Every theme the pack holds. The fonts depend on it, because each theme adds clock glyphs. */
+    public final ThemeSet themes;
 
+    /** Fonts with just the built-in themes. */
     public HudFonts(HudConfig config) {
+        this(config, ThemeSet.of(ThemeSet.builtIn(), config.hud().theme(), warning -> {}));
+    }
+
+    public HudFonts(HudConfig config, ThemeSet themes) {
+        this.themes = themes;
+        int plates = themes.plateOpacities().size(), clocks = themes.clockGlyphs();
         int cell = config.hud().cellPixels();
         int reserved = reservedRows(cell);
         boolean actionBar = config.hud().channel() == HudConfig.Channel.ACTION_BAR;
@@ -30,12 +40,15 @@ public final class HudFonts {
         }
         maxOffsetRows = offsetRows;
         minimap = new FontLayout("hud", 0, cell, MAX_MINIMAP_CELLS + offsetRows + reserved, reserved,
-                actionBar ? FontLayout.Direction.UP_FROM_BOTTOM : FontLayout.Direction.DOWN_FROM_TOP);
+                actionBar ? FontLayout.Direction.UP_FROM_BOTTOM : FontLayout.Direction.DOWN_FROM_TOP, plates, clocks);
 
         int fullCell = config.fullscreen().cellPixels();
         int fullReserved = reservedRows(fullCell);
-        fullscreen = new FontLayout("full", 1, fullCell, config.fullscreen().height() + fullReserved, fullReserved,
-                FontLayout.Direction.DOWN_FROM_TOP);
+        // The fullscreen map never moves, so its coordinate line is always on the same row.
+        int fullHeight = config.fullscreen().height();
+        int fullReadoutRow = fullHeight + (READOUT_GAP + FontLayout.PLATE_MARGIN + fullCell - 1) / fullCell;
+        fullscreen = new FontLayout("full", 1, fullCell, fullHeight + fullReserved, fullReserved,
+                FontLayout.Direction.DOWN_FROM_TOP, plates, clocks, fullReadoutRow);
     }
 
     private static int reservedRows(int cell) {

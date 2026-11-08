@@ -15,9 +15,10 @@ const packs = new Map();
 let botN = 0;
 const liveBots = []; // Quit after each group, so a crash can't leave a duplicate login behind.
 
+/** The shipped config with this server's ports. The clock is off unless a group turns it on, so idle tests stay idle. */
 function baseConfig(edits = {}) {
   fs.copyFileSync(path.join(REPO, 'src/main/resources/config.yml'), CFG);
-  editYaml(CFG, { 'pack.port': packPort, 'tiles.http-url': `http://127.0.0.1:${webPort}`, ...edits });
+  editYaml(CFG, { 'pack.port': packPort, 'tiles.http-url': `http://127.0.0.1:${webPort}`, 'hud.clock.enabled': false, ...edits });
 }
 async function reload(expectPush) {
   const m = s.mark(); s.cmd('bmhud reload');
@@ -51,7 +52,7 @@ async function join(name, opts = {}) {
   if (opts.waitPack !== false) await until(() => bot.packBytes, 8000);
   // Settings persist between runs and groups, which is correct, so tests start from known ones.
   if (name === 'Tester' && !opts.keep && !bot.kicked) {
-    for (const c of ['/hud mode map', '/hud on', '/hud size medium', '/hud zoom 2', '/hud offset 0 0', '/hud show coords', '/hud show players', '/hud show markers', '/map zoom 8']) { bot.say(c); await sleep(120); }
+    for (const c of ['/hud mode map', '/hud theme default', '/hud show clock', '/hud on', '/hud size medium', '/hud zoom 2', '/hud offset 0 0', '/hud show coords', '/hud show players', '/hud show markers', '/map zoom 8']) { bot.say(c); await sleep(120); }
   }
   await sleep(opts.settle ?? 800);
   return bot;
@@ -86,7 +87,148 @@ async function expectMap(name, bot, map, bpc, x, z, w, h, step, brightness = 1, 
 }
 const iconsOf = (f, i) => f.icons.filter((x) => x.icon === i);
 
+/** The readout's text, clock picture and plate in the newest frame. */
+function readoutOf(bot) {
+  const f = bot.hudFrame(packOf(bot));
+  if (!f) return null;
+  return { line: textLines(f)[0]?.s || '', clocks: f.clocks, plates: f.plates, text: f.text.filter((t) => t.readout), frame: f };
+}
+// Clock glyphs are numbered across themes in name order, eight frames each: classic, desert, galaxy, high-contrast.
+const THEME_ORDER = ['classic', 'desert', 'galaxy', 'high-contrast'];
+const clockGlyph = (theme, minutes) => THEME_ORDER.indexOf(theme) * 8 + Math.floor(minutes * 8 / 1440);
+
 const GROUPS = {
+  async clock() {
+    section('The clock on the coordinate line');
+    baseConfig({ 'hud.clock.enabled': true, 'hud.clock.step-minutes': 5 }); await reload();
+    s.cmd('gamerule advance_time false'); s.cmd('time set 6000'); // Tick 6000 is noon.
+    const b = await join('Tester');
+    await chat(b, '/hud mode coords'); await tp('Tester', 8, 120, -9, 180, 0);
+    // Waits for the position too, so a frame from before the teleport never counts.
+    const at = async (ticks, want) => { s.cmd(`time set ${ticks}`); return until(() => { const r = readoutOf(b); return r && r.line.startsWith('8 120 -9 ') && r.line.endsWith(want) && r; }, 4000); };
+    let r = await at(6000, '12:00');
+    check('Noon reads 12:00 after the coordinates', r && r.line === '8 120 -9 N 12:00', r?.line);
+    check('with the sun frame of the default theme', r && r.clocks.length === 1 && r.clocks[0].index === clockGlyph('classic', 720), r && JSON.stringify(r.clocks));
+    const plate = r && r.plates.map((p) => `${p.x}:${p.width}`).join(',');
+    r = await at(18000, '00:00');
+    check('Midnight reads 00:00, with the moon', r && r.clocks[0]?.index === clockGlyph('classic', 0), r?.line);
+    check('The plate stays put as the time changes', r && r.plates.map((p) => `${p.x}:${p.width}`).join(',') === plate, r && r.plates.map((p) => `${p.x}:${p.width}`).join(','));
+    r = await at(0, '06:00');
+    check('Tick 0 is 06:00, sunrise', r && r.clocks[0]?.index === clockGlyph('classic', 360), r?.line);
+    r = await at(6020, '12:00'); // 12:01, so a running clock couldn't reach 12:05 in the next 1.5 seconds either.
+    const before = b.frames.length; await sleep(1500);
+    check('Inside one five-minute step nothing new is sent', b.frames.length === before && readoutOf(b).line.endsWith('12:00'), `${b.frames.length - before} frames`);
+    r = await at(6100, '12:05');
+    check('The next step shows 12:05', r, readoutOf(b)?.line);
+    const hidden = await chat(b, '/hud hide clock', /Hiding the clock/);
+    r = await until(() => { const x = readoutOf(b); return x && !/:/.test(x.line) && x.clocks.length === 0 && x; }, 3000);
+    check('/hud hide clock removes the clock and the time', hidden && r, readoutOf(b)?.line);
+    await chat(b, '/hud show clock', /Showing the clock/);
+    check('/hud show clock brings it back', await until(() => readoutOf(b)?.line.endsWith('12:05'), 3000), readoutOf(b)?.line);
+    s.cmd('execute in minecraft:the_nether run tp Tester 8 70 -9 180 0');
+    r = await until(() => { const x = readoutOf(b); return x && x.line.startsWith('8 70 -9') && x; }, 5000);
+    check('No clock in the Nether, where time stands still', r && r.clocks.length === 0 && !r.line.includes(':'), r?.line);
+    s.cmd('execute in minecraft:overworld run tp Tester 8 120 -9 180 0');
+    check('It comes back in the overworld', await until(() => readoutOf(b)?.line.endsWith('12:05'), 5000), readoutOf(b)?.line);
+    await chat(b, '/hud mode map');
+    r = await until(() => { const x = readoutOf(b); return x && x.frame.runs.length > 0 && x.line.endsWith('12:05') && x; }, 4000);
+    check('The minimap shows the clock too', r && r.clocks.length === 1, r?.line);
+    await chat(b, '/map');
+    r = await until(() => { const x = readoutOf(b); return x && x.frame.fontName === 'bluemaphud:full' && x; }, 4000);
+    check('So does the fullscreen map', r && r.clocks.length === 1 && textLines(r.frame).some((l) => l.s.endsWith('12:05')), r && textLines(r.frame).map((l) => l.s).join(' | '));
+    check('No missing glyphs anywhere', r && r.frame.missing === 0 && r.frame.net === 0, r && `${r.frame.missing} missing`);
+    await chat(b, '/map');
+    baseConfig({ 'hud.clock.enabled': false }); await reload();
+    check('Turning the clock off on the server hides it', await until(() => { const x = readoutOf(b); return x && x.clocks.length === 0 && !x.line.includes(':'); }, 4000), readoutOf(b)?.line);
+    await b.cleanQuit();
+  },
+
+  /** Measures what the clock costs a player who stands still. Not run by default; see docs/decisions.md. */
+  async clockrate() {
+    section('What the clock costs an idle player');
+    s.cmd('gamerule advance_time true');
+    const results = [];
+    for (const step of [1, 5, 10]) {
+      baseConfig({ 'hud.clock.enabled': true, 'hud.clock.step-minutes': step }); await reload();
+      for (const mode of ['map', 'coords']) {
+        const b = await join('Tester');
+        await chat(b, `/hud mode ${mode}`); await tp('Tester', 8, 120, -9, 180, 0); await sleep(2000);
+        const f0 = b.frames.length, b0 = b.barBytes.length, t0 = Date.now();
+        await sleep(30000);
+        const seconds = (Date.now() - t0) / 1000, frames = b.frames.length - f0;
+        const bytes = b.barBytes.slice(b0).reduce((sum, x) => sum + x.zlib, 0);
+        const h = await s.run('bmt health', /BMT mspt ([\d.]+)/);
+        const expected = seconds / (step * 50 / 60); // An in-game minute is 50/60 of a real second.
+        results.push({ step, mode, perSecond: frames / seconds, bytesPerSecond: bytes / seconds, mspt: h ? +h[1] : null });
+        console.log(`  step ${step}, ${mode}: ${frames} updates in ${seconds.toFixed(0)} s (${(frames / seconds).toFixed(2)}/s, about ${expected.toFixed(0)} expected), ${(bytes / seconds).toFixed(0)} B/s compressed, tick ${h?.[1]?.slice(0, 5)} ms`);
+        check(`Step ${step} (${mode}) sends no more than one update per step`, frames <= expected + 2, `${frames} vs ${expected.toFixed(1)}`);
+        await b.cleanQuit();
+      }
+    }
+    s.cmd('gamerule advance_time false');
+    fs.writeFileSync(path.join(ROOT, `clockrate-${label}.json`), JSON.stringify(results, null, 1));
+  },
+
+  async themes() {
+    section('Themes');
+    baseConfig({ 'hud.clock.enabled': true }); await reload();
+    s.cmd('gamerule advance_time false'); s.cmd('time set 6000');
+    const b = await join('Tester');
+    await chat(b, '/hud mode coords'); await tp('Tester', 8, 120, -9, 180, 0);
+    const list = await chat(b, '/hud theme', /Themes:/);
+    check('/hud theme lists every theme and marks the current one', list && /Classic \(yours\)/.test(list) && /Desert/.test(list) && /Galaxy/.test(list) && /High Contrast/.test(list), list);
+    const colours = { classic: [0x000000, 0xFFFFFF, 0xBEC6D2], desert: [0x1E1208, 0xFFFFFF, 0xE2CDB0], galaxy: [0x140A28, 0xFFFFFF, 0xCFC6F2], 'high-contrast': [0x000000, 0xFFFFFF, 0xFFFF00] };
+    for (const theme of THEME_ORDER) {
+      const said = await chat(b, `/hud theme ${theme}`, /Theme set to/);
+      const r = await until(() => { const x = readoutOf(b); return x && x.clocks[0]?.index === clockGlyph(theme, 720) && x; }, 4000);
+      const [plate, text, facing] = colours[theme];
+      const ok = r && r.plates.every((p) => p.color === plate) && r.text.some((t) => t.color === text) && r.text.some((t) => t.color === facing);
+      check(`${theme}: its clock, plate and colours`, said && ok, r && `plate ${r.plates.map((p) => p.color.toString(16)).join(',')} text ${[...new Set(r.text.map((t) => t.color.toString(16)))].join(',')}`);
+    }
+    const plateWidths = new Set();
+    for (const theme of THEME_ORDER) { await chat(b, `/hud theme ${theme}`, /Theme set to/); await sleep(500); plateWidths.add(readoutOf(b).plates.map((p) => p.width).join('+')); }
+    check('Every theme draws the same size line', plateWidths.size === 1, [...plateWidths].join(' | '));
+    await chat(b, '/hud theme desert', /Theme set to/);
+    const bad = await chat(b, '/hud theme sparkles', /no theme called sparkles/);
+    check('An unknown theme says what exists', bad && /classic, desert, galaxy, high-contrast/.test(bad), bad);
+    await b.cleanQuit();
+    const back = await join('Tester', { keep: true });
+    check('The choice is saved', await until(() => readoutOf(back)?.clocks[0]?.index === clockGlyph('desert', 720), 5000), JSON.stringify(readoutOf(back)?.clocks));
+    const reset = await chat(back, '/hud theme default', /server's theme, Classic/);
+    check('/hud theme default goes back to the server\'s', reset && await until(() => readoutOf(back)?.clocks[0]?.index === clockGlyph('classic', 720), 4000), reset);
+    await back.cleanQuit();
+
+    const m = s.mark();
+    baseConfig({ 'hud.clock.enabled': true, 'hud.theme': 'galaxy' }); await reload();
+    const fresh = await join(`T${Date.now() % 100000}`);
+    await chat(fresh, '/hud mode coords');
+    check('A new player gets the server\'s default theme', await until(() => readoutOf(fresh)?.clocks[0]?.index === clockGlyph('galaxy', 720), 5000), JSON.stringify(readoutOf(fresh)?.clocks));
+    check('The log lists the themes and the default', /Themes: classic, desert, galaxy, high-contrast\. New players get galaxy\./.test(s.since(m)));
+    await fresh.cleanQuit();
+    const m2 = s.mark();
+    baseConfig({ 'hud.clock.enabled': true, 'hud.theme': 'sparkles' }); await reload();
+    check('An unknown default theme is reported and falls back to classic', /no theme called sparkles, so the default is classic/.test(s.since(m2)), s.since(m2).split('\n').find((l) => /theme/i.test(l))?.slice(0, 160));
+
+    const folder = s.path('plugins/BlueMapHUD/themes');
+    fs.mkdirSync(folder, { recursive: true });
+    const custom = JSON.parse(fs.readFileSync(path.join(REPO, 'src/main/resources/themes/classic.json'), 'utf8'));
+    custom.name = 'Ocean'; custom.colors.plate = '#001A33';
+    fs.writeFileSync(path.join(folder, 'ocean.json'), JSON.stringify(custom));
+    fs.writeFileSync(path.join(folder, 'broken.json'), '{ nope');
+    const m3 = s.mark();
+    baseConfig({ 'hud.clock.enabled': true }); await reload();
+    check('A server theme in plugins/BlueMapHUD/themes is added', /Themes: classic, desert, galaxy, high-contrast, ocean\./.test(s.since(m3)), s.since(m3).split('\n').find((l) => /Themes:/.test(l))?.slice(0, 160));
+    check('A broken one is reported and skipped', /Theme broken couldn't be loaded/.test(s.since(m3)));
+    check('A hard-to-read one is reported, and still loads', /Theme ocean is hard to read in places: facing #BEC6D2/.test(s.since(m3)));
+    const o = await join('Tester');
+    await chat(o, '/hud theme ocean', /Theme set to Ocean/);
+    check('Players can pick it', await until(() => readoutOf(o)?.plates.every((p) => p.color === 0x001A33), 4000));
+    await chat(o, '/hud theme default');
+    await o.cleanQuit();
+    fs.rmSync(folder, { recursive: true, force: true });
+    baseConfig(); await reload();
+  },
+
   async onebar() {
     section('Only ever one boss bar');
     baseConfig(); await reload();
@@ -922,12 +1064,12 @@ const GROUPS = {
   await s.start(); await sleep(6000);
   s.cmd('op Tester'); s.cmd('whitelist off'); s.cmd('difficulty easy'); s.cmd('gamerule keep_inventory true');
   for (const c of ['execute in minecraft:overworld run forceload add -32 -32 32 32']) s.cmd(c);
-  const names = only || Object.keys(GROUPS).filter((n) => n !== 'load');
+  const names = only || Object.keys(GROUPS).filter((n) => n !== 'load' && n !== 'clockrate');
   for (const n of names) {
     const m = s.mark();
     try { await GROUPS[n](); } catch (e) { check(`Group ${n} finished`, false, e.stack?.slice(0, 400)); }
     for (const bot of liveBots.splice(0)) if (bot.ended === null) await bot.cleanQuit();
-    const hudErrors = s.errors(m).filter((l) => /extantape|\[BlueMapHUD\]/.test(l) && !/icons must be|Ignoring|no resource pack|doesn't contain|Could not download pack.public-url \(http:\/\/127.0.0.1:\d+\/custom.zip\)/.test(l));
+    const hudErrors = s.errors(m).filter((l) => /extantape|\[BlueMapHUD\]/.test(l) && !/icons must be|Ignoring|no resource pack|doesn't contain|Could not download pack.public-url \(http:\/\/127.0.0.1:\d+\/custom.zip\)|no theme called sparkles|Theme broken couldn't be loaded|Theme ocean is hard to read/.test(l));
     check(`No BlueMapHUD errors during ${n}`, hudErrors.length === 0, hudErrors[0]?.slice(0, 200) || '');
     const drops = s.since(m).split('\n').filter((l) => /lost connection: (?!Disconnected|This server needs|.*resource pack)/.test(l));
     check(`No unexpected disconnects during ${n}`, drops.length === 0, drops[0]?.slice(0, 160) || '');

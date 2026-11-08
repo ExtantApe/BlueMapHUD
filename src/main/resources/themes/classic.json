@@ -1,0 +1,113 @@
+{
+  "name": "Classic",
+  "colors": {
+    "text": "#FFFFFF",
+    "facing": "#BEC6D2",
+    "time": "#BEC6D2",
+    "legend": "#BEC6D2",
+    "plate": "#000000",
+    "self": "#FFFFFF",
+    "player": "#66D9FF",
+    "poi": "#FFC845",
+    "death": "#FF5B5B",
+    "north": "#FFFFFF"
+  },
+  "plate-opacity": 176,
+  "clock": {
+    "about": "The plain default: a sun by day, rising and setting at 06:00 and 18:00, and a crescent moon at night. Eight frames from 00:00, three hours apart.",
+    "palette": {
+      "s": "#FFE27A",
+      "m": "#E6ECF5"
+    },
+    "frames": [
+      [
+        "...mmm...",
+        "..mm.....",
+        ".mm......",
+        ".mm......",
+        ".mm......",
+        ".mm......",
+        "..mm.....",
+        "...mmm...",
+        "........."
+      ],
+      [
+        "...mmm...",
+        "..mm.....",
+        ".mm......",
+        ".mm......",
+        ".mm......",
+        ".mm......",
+        "..mm.....",
+        "...mmm...",
+        "........."
+      ],
+      [
+        ".........",
+        ".........",
+        ".........",
+        "....s....",
+        ".s.....s.",
+        "...sss...",
+        "..sssss..",
+        "sssssssss",
+        "........."
+      ],
+      [
+        "....s....",
+        ".s.....s.",
+        "...sss...",
+        "..sssss..",
+        "s.sssss.s",
+        "..sssss..",
+        "...sss...",
+        ".s.....s.",
+        "....s...."
+      ],
+      [
+        "....s....",
+        ".s.....s.",
+        "...sss...",
+        "..sssss..",
+        "s.sssss.s",
+        "..sssss..",
+        "...sss...",
+        ".s.....s.",
+        "....s...."
+      ],
+      [
+        "....s....",
+        ".s.....s.",
+        "...sss...",
+        "..sssss..",
+        "s.sssss.s",
+        "..sssss..",
+        "...sss...",
+        ".s.....s.",
+        "....s...."
+      ],
+      [
+        ".........",
+        ".........",
+        ".........",
+        "....s....",
+        ".s.....s.",
+        "...sss...",
+        "..sssss..",
+        "sssssssss",
+        "........."
+      ],
+      [
+        "...mmm...",
+        "..mm.....",
+        ".mm......",
+        ".mm......",
+        ".mm......",
+        ".mm......",
+        "..mm.....",
+        "...mmm...",
+        "........."
+      ]
+    ]
+  }
+}

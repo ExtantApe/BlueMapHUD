@@ -5,6 +5,8 @@ import com.extantape.bluemaphud.config.HudConfig;
 import com.extantape.bluemaphud.hud.HudManager;
 import com.extantape.bluemaphud.hud.HudSession;
 import com.extantape.bluemaphud.hud.PlayerSettings;
+import com.extantape.bluemaphud.theme.Theme;
+import com.extantape.bluemaphud.theme.ThemeSet;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -14,6 +16,9 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.ClickEvent;
+import net.kyori.adventure.text.event.HoverEvent;
+import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
@@ -148,10 +153,22 @@ public final class HudCommands {
                                 : "You're seeing the minimap. Use /hud mode coords for coordinates only.")))
                         .then(Commands.literal("map").executes(player((p, s) -> setCoordsOnly(p, s, false))))
                         .then(Commands.literal("coords").executes(player((p, s) -> setCoordsOnly(p, s, true)))))
+                .then(Commands.literal("theme")
+                        .executes(player((p, s) -> listThemes(p, s)))
+                        .then(Commands.argument("name", StringArgumentType.word())
+                                .suggests((ctx, builder) -> {
+                                    String typed = builder.getRemaining().toLowerCase(Locale.ROOT);
+                                    for (Theme theme : plugin.themes().themes()) if (theme.id().startsWith(typed)) builder.suggest(theme.id());
+                                    if ("default".startsWith(typed)) builder.suggest("default");
+                                    return builder.buildFuture();
+                                })
+                                .executes(ctx -> withPlayer(ctx, (p, s) -> setTheme(p, s, StringArgumentType.getString(ctx, "name"))))))
                 .then(Commands.literal("hide")
-                        .then(partOption("coords", false)).then(partOption("players", false)).then(partOption("markers", false)))
+                        .then(partOption("coords", false)).then(partOption("players", false)).then(partOption("markers", false))
+                        .then(partOption("clock", false)))
                 .then(Commands.literal("show")
-                        .then(partOption("coords", true)).then(partOption("players", true)).then(partOption("markers", true)));
+                        .then(partOption("coords", true)).then(partOption("players", true)).then(partOption("markers", true))
+                        .then(partOption("clock", true)));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> sizeOption(String name) {
@@ -180,11 +197,53 @@ public final class HudCommands {
             switch (part) {
                 case "coords" -> settings.showCoords = visible;
                 case "players" -> settings.showPlayers = visible;
+                case "clock" -> settings.showClock = visible;
                 default -> settings.showMarkers = visible;
             }
             plugin.hud().saveSettings(p, s);
-            reply(p, (visible ? "Showing " : "Hiding ") + part + ".");
+            reply(p, (visible ? "Showing " : "Hiding ") + (part.equals("clock") ? "the clock" : part) + ".");
+            if (part.equals("clock") && visible && !plugin.config().hud().clock()) {
+                error(p, "The clock is turned off on this server, so it won't show.");
+            }
         }));
+    }
+
+    /** Lists the themes, marking the player's own, with each name clickable to switch to it. */
+    private void listThemes(Player player, HudSession session) {
+        ThemeSet themes = plugin.themes();
+        int current = themes.resolve(session.settings().theme);
+        Component line = Component.text("Themes: ", NamedTextColor.GRAY);
+        for (int i = 0; i < themes.size(); i++) {
+            Theme theme = themes.get(i);
+            boolean mine = i == current;
+            Component name = Component.text(theme.name(), mine ? NamedTextColor.WHITE : NamedTextColor.AQUA)
+                    .decoration(TextDecoration.UNDERLINED, !mine)
+                    .clickEvent(ClickEvent.runCommand("/bluemaphud:hud theme " + theme.id()))
+                    .hoverEvent(HoverEvent.showText(Component.text(mine ? "Your theme" : "Switch to " + theme.name())));
+            line = line.append(name).append(Component.text(mine ? " (yours)" : "", NamedTextColor.GRAY))
+                    .append(Component.text(i + 1 < themes.size() ? ", " : "", NamedTextColor.GRAY));
+        }
+        player.sendMessage(line);
+        reply(player, "Click one, or use /hud theme <name>. /hud theme default goes back to the server's.");
+    }
+
+    private void setTheme(Player player, HudSession session, String name) {
+        ThemeSet themes = plugin.themes();
+        String wanted = name.toLowerCase(Locale.ROOT);
+        if (wanted.equals("default")) {
+            session.settings().theme = null;
+            plugin.hud().saveSettings(player, session);
+            reply(player, "Using the server's theme, " + themes.defaultTheme().name() + ".");
+            return;
+        }
+        int index = themes.indexOf(wanted);
+        if (index < 0) {
+            error(player, "There's no theme called " + name + ". Try " + String.join(", ", themes.themes().stream().map(Theme::id).toList()) + ".");
+            return;
+        }
+        session.settings().theme = themes.get(index).id();
+        plugin.hud().saveSettings(player, session);
+        reply(player, "Theme set to " + themes.get(index).name() + ".");
     }
 
     private void setEnabled(Player player, HudSession session, boolean enabled) {
@@ -255,7 +314,7 @@ public final class HudCommands {
         HudManager hud = plugin.hud();
         sender.sendMessage(Component.text("BlueMapHUD", NamedTextColor.AQUA));
         sender.sendMessage(Component.text("Fullscreen map: toggle, or zoom <n|in|out>. Sneak + F also opens it."));
-        sender.sendMessage(Component.text("Minimap: on, off, mode map or coords, zoom, size, offset, corner, hide and show."));
+        sender.sendMessage(Component.text("Minimap: on, off, mode map or coords, zoom, size, offset, corner, theme, hide and show (coords, players, markers, clock)."));
         if (sender.hasPermission("bluemaphud.admin")) {
             sender.sendMessage(Component.text("Admin: /bmhud reload, debug, debug dump, debug pattern, pack export."));
             sender.sendMessage(Component.text(hud.debugLine()));

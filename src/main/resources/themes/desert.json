@@ -1,0 +1,23 @@
+{
+  "name": "Desert",
+  "colors": {
+    "text": "#FFFFFF", "facing": "#E2CDB0", "time": "#FFDFA6", "legend": "#E2CDB0",
+    "plate": "#1E1208",
+    "self": "#FFFFFF", "player": "#66D9FF", "poi": "#FFC845", "death": "#FF6B5B", "north": "#FFFFFF"
+  },
+  "plate-opacity": 200,
+  "clock": {
+    "about": "A dune with a cactus. The sun rises on the left, crosses the sky and sets by the cactus; the moon follows at night. Eight frames from 00:00, three hours apart.",
+    "palette": { "c": "#7CD65A", "s": "#FFD54A", "o": "#FFA040", "m": "#F4F1E4", "*": "#FFFFFF", "d": "#EBC07F" },
+    "frames": [
+      ["....mm...", "...m.....", "...m.....", "....mm.c.", "*.....ccc", "......c.c", "..*....c.", "ddddddddd", "ddddddddd"],
+      [".........", "..*......", ".......c.", "....mm.cc", "...m..cc.", "...m...c.", "....mm.c.", "ddddddddd", "ddddddddd"],
+      [".........", ".........", ".........", ".......c.", "......ccc", ".o.....cc", "ooo....c.", "ddddddddd", "ddddddddd"],
+      [".........", ".sss.....", ".sss...c.", ".sss..ccc", "......c.c", ".......c.", ".......c.", "ddddddddd", "ddddddddd"],
+      ["...sss...", "...sss...", "...sss.c.", "......ccc", "......c.c", ".......c.", ".......c.", "ddddddddd", "ddddddddd"],
+      [".........", ".....sss.", ".....sssc", ".....sscc", "......c.c", ".......c.", ".......c.", "ddddddddd", "ddddddddd"],
+      [".........", ".........", ".......c.", "......ccc", "......c.c", "....o..c.", "...ooo.c.", "ddddddddd", "ddddddddd"],
+      [".........", ".........", "......*c.", ".mm...ccc", "m.....c.c", "m......c.", ".mm....c.", "ddddddddd", "ddddddddd"]
+    ]
+  }
+}

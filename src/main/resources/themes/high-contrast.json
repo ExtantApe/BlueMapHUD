@@ -1,0 +1,113 @@
+{
+  "name": "High Contrast",
+  "colors": {
+    "text": "#FFFFFF",
+    "facing": "#FFFF00",
+    "time": "#FFFF00",
+    "legend": "#FFFF00",
+    "plate": "#000000",
+    "self": "#FFFFFF",
+    "player": "#00FFFF",
+    "poi": "#FFFF00",
+    "death": "#FF4040",
+    "north": "#FFFFFF"
+  },
+  "plate-opacity": 255,
+  "clock": {
+    "about": "For low vision and bright screens: a solid black plate, pure white and yellow text, and the plainest shapes. Eight frames from 00:00, three hours apart.",
+    "palette": {
+      "s": "#FFFF00",
+      "m": "#FFFFFF"
+    },
+    "frames": [
+      [
+        "...mmm...",
+        "..mm.....",
+        ".mm......",
+        ".mm......",
+        ".mm......",
+        ".mm......",
+        "..mm.....",
+        "...mmm...",
+        "........."
+      ],
+      [
+        "...mmm...",
+        "..mm.....",
+        ".mm......",
+        ".mm......",
+        ".mm......",
+        ".mm......",
+        "..mm.....",
+        "...mmm...",
+        "........."
+      ],
+      [
+        ".........",
+        ".........",
+        ".........",
+        "....s....",
+        ".s.....s.",
+        "...sss...",
+        "..sssss..",
+        "sssssssss",
+        "........."
+      ],
+      [
+        "....s....",
+        ".s.....s.",
+        "...sss...",
+        "..sssss..",
+        "s.sssss.s",
+        "..sssss..",
+        "...sss...",
+        ".s.....s.",
+        "....s...."
+      ],
+      [
+        "....s....",
+        ".s.....s.",
+        "...sss...",
+        "..sssss..",
+        "s.sssss.s",
+        "..sssss..",
+        "...sss...",
+        ".s.....s.",
+        "....s...."
+      ],
+      [
+        "....s....",
+        ".s.....s.",
+        "...sss...",
+        "..sssss..",
+        "s.sssss.s",
+        "..sssss..",
+        "...sss...",
+        ".s.....s.",
+        "....s...."
+      ],
+      [
+        ".........",
+        ".........",
+        ".........",
+        "....s....",
+        ".s.....s.",
+        "...sss...",
+        "..sssss..",
+        "sssssssss",
+        "........."
+      ],
+      [
+        "...mmm...",
+        "..mm.....",
+        ".mm......",
+        ".mm......",
+        ".mm......",
+        ".mm......",
+        "..mm.....",
+        "...mmm...",
+        "........."
+      ]
+    ]
+  }
+}

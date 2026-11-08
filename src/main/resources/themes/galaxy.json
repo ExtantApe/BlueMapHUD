@@ -1,0 +1,23 @@
+{
+  "name": "Galaxy",
+  "colors": {
+    "text": "#FFFFFF", "facing": "#CFC6F2", "time": "#DCD2FF", "legend": "#CFC6F2",
+    "plate": "#140A28",
+    "self": "#FFFFFF", "player": "#7FE3FF", "poi": "#FFD86B", "death": "#FF7A90", "north": "#FFFFFF"
+  },
+  "plate-opacity": 200,
+  "clock": {
+    "about": "A small sun on a planet's orbit, read like a clock face with noon at the top. Eight frames from 00:00, three hours apart.",
+    "palette": { "p": "#C2B0FF", "h": "#FFFFFF", "o": "#AEB8FF", "s": "#FFE27A" },
+    "frames": [
+      [".........", ".o.....o.", ".........", "...ppp...", "o..php..o", "...ppp...", ".........", ".o..s..o.", "...sss..."],
+      [".........", ".o.....o.", ".........", "...ppp...", "o..php..o", "...ppp...", ".s.......", "sss....o.", ".s......."],
+      [".........", ".o.....o.", ".........", "s..ppp...", "ss.php..o", "s..ppp...", ".........", ".o.....o.", "........."],
+      [".s.......", "sss....o.", ".s.......", "...ppp...", "o..php..o", "...ppp...", ".........", ".o.....o.", "........."],
+      ["...sss...", ".o..s..o.", ".........", "...ppp...", "o..php..o", "...ppp...", ".........", ".o.....o.", "........."],
+      [".......s.", ".o....sss", ".......s.", "...ppp...", "o..php..o", "...ppp...", ".........", ".o.....o.", "........."],
+      [".........", ".o.....o.", ".........", "...ppp..s", "o..php.ss", "...ppp..s", ".........", ".o.....o.", "........."],
+      [".........", ".o.....o.", ".........", "...ppp...", "o..php..o", "...ppp...", ".......s.", ".o....sss", ".......s."]
+    ]
+  }
+}

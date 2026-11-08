@@ -236,7 +236,20 @@ public final class HudManager {
         return new Snapshot(mapId, location.getBlockX(), location.getBlockY(), location.getBlockZ(), location.getYaw(), full,
                 full ? settings.fullscreenZoom : settings.zoom, settings.size, settings.offsetX, settings.offsetY,
                 settings.showCoords, settings.showMarkers, visiblePlayers(player, session, location), death, session.pattern,
-                settings.coordsOnly && !full && !session.pattern);
+                settings.coordsOnly && !full && !session.pattern, frames.themes().resolve(settings.theme),
+                clockMinutes(player.getWorld(), settings));
+    }
+
+    /**
+     * The time to show, rounded down to the clock's step, or -1 when the clock is off or time stands still,
+     * as in the Nether and the End. Tick 0 is 06:00.
+     */
+    private int clockMinutes(World world, PlayerSettings settings) {
+        if (!config.hud().clock() || !settings.showClock || world.isFixedTime()) return -1;
+        long ticks = Math.floorMod(world.getTime() + 6000, 24000L);
+        int minute = (int) (ticks * 1440 / 24000);
+        int step = config.hud().clockStepMinutes();
+        return minute / step * step;
     }
 
     private int[] visiblePlayers(Player viewer, HudSession session, Location at) {

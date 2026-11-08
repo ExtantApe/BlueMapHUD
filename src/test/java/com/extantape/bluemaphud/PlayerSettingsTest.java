@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** The server's default mode, and settings saved before modes existed. */
+/** The server's default mode, the clock and theme choices, and settings saved by older versions. */
 class PlayerSettingsTest {
     private static HudConfig config(String defaultMode) {
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(new InputStreamReader(
@@ -32,6 +32,7 @@ class PlayerSettingsTest {
                 new Class<?>[] {PersistentDataContainer.class}, (proxy, method, args) -> switch (method.getName()) {
                     case "get" -> values.get(args[0]);
                     case "set" -> values.put(args[0], args[2]);
+                    case "remove" -> values.remove(args[0]);
                     default -> throw new UnsupportedOperationException(method.getName());
                 });
     }
@@ -79,5 +80,34 @@ class PlayerSettingsTest {
         assertFalse(old.showMarkers);
         assertFalse(old.coordsOnly);
         assertTrue(PlayerSettings.load(data, config("coords")).coordsOnly, "They never chose a mode, so they get the default");
+    }
+
+    @Test
+    void theClockAndThemeAreSaved() {
+        PersistentDataContainer data = container();
+        PlayerSettings fresh = PlayerSettings.load(data, config(null));
+        assertTrue(fresh.showClock, "The clock shows by default");
+        assertEquals(null, fresh.theme, "No theme chosen means the server's");
+        fresh.showClock = false;
+        fresh.theme = "desert";
+        fresh.save(data);
+        PlayerSettings loaded = PlayerSettings.load(data, config(null));
+        assertFalse(loaded.showClock);
+        assertEquals("desert", loaded.theme);
+        loaded.theme = null;
+        loaded.save(data);
+        assertEquals(null, PlayerSettings.load(data, config(null)).theme, "Going back to the default forgets the choice");
+    }
+
+    @Test
+    void settingsSavedBeforeTheClockStillLoad() {
+        PersistentDataContainer data = container();
+        // The second format added the mode at the end.
+        data.set(new org.bukkit.NamespacedKey("bluemaphud", "settings"),
+                org.bukkit.persistence.PersistentDataType.INTEGER_ARRAY, new int[] {2, 1, 4, 16, 40, 0, 0, 1, 1, 1, 1});
+        PlayerSettings old = PlayerSettings.load(data, config("map"));
+        assertTrue(old.coordsOnly);
+        assertEquals(4, old.zoom);
+        assertTrue(old.showClock, "They never hid the clock");
     }
 }
