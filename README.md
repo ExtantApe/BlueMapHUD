@@ -37,7 +37,7 @@ If BlueMap stores its maps in SQL, set `tiles.source: http`.
 | `/hud offset <x> <y>` | Moves the minimap, in GUI pixels from top centre. |
 | `/hud corner left\|right\|center` | Moves it to a rough preset position. |
 | `/hud hide\|show coords\|players\|markers` | Toggles one part of the map. Coordinates show X, Y, Z and facing. |
-| `/hud mode coords\|map` | `coords` shows only the X, Y, Z and facing line, in the same bar, and works in worlds BlueMap doesn't map. `map` brings the minimap back. Both turn the HUD on. |
+| `/hud mode coords\|map` | `coords` shows only the X, Y, Z and facing line, in the same bar, and works in worlds BlueMap doesn't map. `map` brings the minimap back. Both turn the HUD on. New players start in `hud.default-mode`, which is `map` unless the config says `coords`. |
 | `/bmhud help` | Shows help. |
 | `/bmhud reload` | Reloads the config, and re-sends the pack if it changed. |
 | `/bmhud debug` | Shows cache sizes, build times and update sizes. |

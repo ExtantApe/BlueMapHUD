@@ -21,7 +21,7 @@ public record HudConfig(
                         int cacheChunks, Map<String, String> mapOverrides) {}
 
     public record Hud(boolean enabledByDefault, Channel channel, int updateTicks, int size, int zoom,
-                      int cellPixels, int offsetX, int offsetY, int maxOffsetY, int cornerX, boolean coords,
+                      int cellPixels, int offsetX, int offsetY, int maxOffsetY, int cornerX, boolean coords, boolean coordsOnlyByDefault,
                       int colorStep, int voidColor, boolean hideWhileFullscreen, boolean hideForOtherBossBar,
                       boolean hideInSpectator, boolean quickHideGesture) {}
 
@@ -66,6 +66,7 @@ public record HudConfig(
                 clamp(c.getInt("hud.max-offset-y", 64), 0, 256),
                 c.getInt("hud.corner-x", 170),
                 c.getBoolean("hud.coords", true),
+                "coords".equalsIgnoreCase(c.getString("hud.default-mode", "map")),
                 clamp(c.getInt("hud.color-step", 8), 1, 64),
                 parseColor(c.getString("hud.void-color", "#14161a"), 0x14161a),
                 c.getBoolean("hud.auto-hide.while-fullscreen", true),

@@ -32,6 +32,9 @@ hud:
   # How far left or right of centre /hud corner moves the map.
   corner-x: 170
   coords: true
+  # What new players see: map, or coords for only the X, Y, Z and facing line.
+  # Players can switch with /hud mode, and their choice is saved.
+  default-mode: map
   # Rounds colours to this step so runs get longer and packets get smaller.
   color-step: 8
   # Shown where BlueMap has no tile yet.

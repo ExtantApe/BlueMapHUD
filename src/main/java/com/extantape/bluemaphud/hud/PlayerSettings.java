@@ -33,6 +33,7 @@ public final class PlayerSettings {
         settings.offsetX = config.hud().offsetX();
         settings.offsetY = config.hud().offsetY();
         settings.showCoords = config.hud().coords();
+        settings.coordsOnly = config.hud().coordsOnlyByDefault();
 
         int[] saved = data.get(KEY, PersistentDataType.INTEGER_ARRAY);
         if (saved != null && (saved.length == 10 && saved[0] == FORMAT_WITHOUT_MODE || saved.length == 11 && saved[0] == FORMAT)) {
@@ -45,7 +46,8 @@ public final class PlayerSettings {
             settings.showCoords = saved[7] != 0;
             settings.showPlayers = saved[8] != 0;
             settings.showMarkers = saved[9] != 0;
-            settings.coordsOnly = saved.length == 11 && saved[10] != 0;
+            // Players saved before modes existed never chose one, so they get the server's default.
+            if (saved.length == 11) settings.coordsOnly = saved[10] != 0;
         }
         return settings;
     }
