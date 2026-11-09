@@ -26,7 +26,7 @@ if [ "${BMH_ACCEPT_EULA:-}" != "1" ]; then
 fi
 
 PAPER=paper-$VERSION.jar
-HUD_JAR=$(ls "$REPO"/build/libs/BlueMapHUD-*.jar 2>/dev/null | head -1)
+HUD_JAR=$(ls "$REPO"/build/libs/BlueMinimap-*.jar 2>/dev/null | head -1)
 HELPER_JAR=$REPO/test/live/helper/build/libs/LiveTestHelper.jar
 CONFLICT_JAR=$REPO/test/live/conflict/build/libs/LiveTestConflict.jar
 missing=0
@@ -49,7 +49,7 @@ trap remove_server EXIT
 remove_server
 
 echo "== Building a throwaway Paper $VERSION server in $SERVER"
-mkdir -p "$SERVER/plugins/BlueMapHUD"
+mkdir -p "$SERVER/plugins/BlueMinimap"
 echo "eula=true" > "$SERVER/eula.txt"
 cat > "$SERVER/server.properties" <<EOF
 server-ip=127.0.0.1
@@ -62,15 +62,15 @@ spawn-protection=0
 level-seed=4242
 view-distance=6
 simulation-distance=6
-motd=BlueMapHUD throwaway test server
+motd=BlueMinimap throwaway test server
 EOF
 cp "$WORK/bluemap.jar" "$SERVER/plugins/BlueMap.jar"
 cp "$WORK/ViaVersion.jar" "$WORK/ViaBackwards.jar" "$SERVER/plugins/"
 cp "$HELPER_JAR" "$SERVER/plugins/"
-cp "$HUD_JAR" "$SERVER/plugins/BlueMapHUD.jar"
+cp "$HUD_JAR" "$SERVER/plugins/BlueMinimap.jar"
 # Set the ports before the first start, so the defaults never clash with another server on this machine.
 sed -e "s/^  port: 8164$/  port: $PACK_PORT/" -e "s#http://127.0.0.1:8100#http://127.0.0.1:$WEB_PORT#" \
-  "$REPO/src/main/resources/config.yml" > "$SERVER/plugins/BlueMapHUD/config.yml"
+  "$REPO/src/main/resources/config.yml" > "$SERVER/plugins/BlueMinimap/config.yml"
 
 cd "$HERE"
 node firstboot.js "$NAME" "$PAPER" "$PORT" > "$WORK/$NAME-boot.log" 2>&1 || { echo "First start failed:"; tail -5 "$WORK/$NAME-boot.log"; exit 1; }
@@ -92,6 +92,10 @@ for test in "${TESTS[@]}"; do
     packurl) node packurl.js "$VERSION" "$NAME" "$PAPER" "$PORT" "$PACK_PORT" "$WEB_PORT" "$HOST_PORT" > "$log" 2>&1 || status=1 ;;
     storage) node storage.js "$NAME" "$PAPER" "$PORT" "$WEB_PORT" "$PACK_PORT" > "$log" 2>&1 || status=1 ;;
     backoff) node backoff.js "$NAME" "$PAPER" "$PORT" "$CONFLICT_JAR" > "$log" 2>&1 || status=1 ;;
+    houserules) # The real HouseRules, current and 0.1.1: BMH_HOUSERULES_JAR and BMH_HOUSERULES_OLD_JAR.
+      if [ -f "${BMH_HOUSERULES_JAR:-}" ] && [ -f "${BMH_HOUSERULES_OLD_JAR:-}" ]; then
+        node houserules.js "$NAME" "$PAPER" "$PORT" "$BMH_HOUSERULES_JAR" "$BMH_HOUSERULES_OLD_JAR" > "$log" 2>&1 || status=1
+      else echo "SKIP  houserules  [set BMH_HOUSERULES_JAR and BMH_HOUSERULES_OLD_JAR]" | tee "$log"; fi ;;
     *) echo "Unknown test: $test"; status=1; continue ;;
   esac
   grep -E "^(FAIL|SKIP)|^SUMMARY|CRASHED" "$log" || true

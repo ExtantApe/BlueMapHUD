@@ -1,4 +1,4 @@
-# BlueMapHUD configuration. Apply changes with /bmhud reload.
+# BlueMinimap configuration. Apply changes with /blueminimap reload.
 
 tiles:
   # file: read BlueMap's folder directly (fastest, file storage only).
@@ -36,7 +36,7 @@ hud:
   # Players can switch with /hud mode, and their choice is saved.
   default-mode: map
   # Colours, plate and clock style for new players: classic, galaxy, desert or high-contrast, or a theme
-  # of your own in plugins/BlueMapHUD/themes/. Players can choose their own with /hud theme.
+  # of your own in plugins/BlueMinimap/themes/. Players can choose their own with /hud theme.
   theme: classic
   clock:
     # A small clock and the in-game time after the coordinates, in 24-hour time. It's hidden where time
@@ -57,8 +57,8 @@ hud:
     quick-hide-gesture: false
 
 commands:
-  # The first name no other plugin owns is used. /bmhud map, /bmhud hud,
-  # /bluemaphud:map and /bluemaphud:hud always work.
+  # The first name no other plugin owns is used. /blueminimap map, /blueminimap hud,
+  # /blueminimap:map and /blueminimap:hud always work.
   map-names: [map, worldmap]
   hud-names: [hud, minimap]
 
@@ -96,21 +96,21 @@ markers:
   show-death: true
 
 pack:
-  # false means your own merged pack provides the files. See /bmhud pack export.
+  # false means your own merged pack provides the files. See /blueminimap pack export.
   send: true
   # true kicks players who decline the pack, with kick-message. A download that fails never kicks:
   # the player plays without the map, admins are warned, and it tries again on a world change or rejoin.
   required: true
-  kick-message: "This server needs the BlueMapHUD resource pack."
-  prompt: "BlueMapHUD draws the map with this small resource pack."
+  kick-message: "This server needs the BlueMinimap resource pack."
+  prompt: "BlueMinimap draws the map with this small resource pack."
   port: 8164
   # Host players download from. Empty uses the address they connected to.
   host: ""
   # Host the pack elsewhere, such as a CDN or GitHub release. Overrides the port.
   # {sha1} is replaced with the built pack's hash, so the address changes when the pack does.
-  # Upload plugins/BlueMapHUD/pack/bluemaphud-pack.zip unchanged; re-zipping it changes the hash.
+  # Upload plugins/BlueMinimap/pack/blueminimap-pack.zip unchanged; re-zipping it changes the hash.
   public-url: ""
-  # On startup and /bmhud reload, download public-url once and warn if it isn't the current pack.
+  # On startup and /blueminimap reload, download public-url once and warn if it isn't the current pack.
   # Turn off if the server itself can't reach that address.
   verify-public-url: true
   # Make one boss bar colour transparent. Turn off only with the action bar.
@@ -126,7 +126,7 @@ share:
   # Who can be offered a share: world-group is players in the sender's world, counting its _nether and
   # _the_end as the same world. all-online is everyone, for servers whose rules plugin narrows each share
   # through CoordinateShareEvent; with no such plugin listening it acts like world-group. Players who
-  # turned shares off (/hud hide shares) or lack bluemaphud.share.receive are never offered.
+  # turned shares off (/hud hide shares) or lack blueminimap.share.receive are never offered.
   candidates: world-group
   # Seconds a player waits between shares, so it can't be used to spam.
   cooldown-seconds: 30
