@@ -1,0 +1,25 @@
+# Test audit
+
+Kept by this repo's owning session (Minecraft: Plugins Lead), per `~/Code/CLAUDE.md`, "Test self-audits". Newest first.
+
+## 2026-11-09: first full audit (at 0.2.0)
+
+The README's Testing section already lists what the live suite covers, check by check, so this audit starts from the promises that matter most for children's safety and privacy and for failing closed, then confirms the rest map to the Testing list.
+
+| Promise | Covered by |
+| --- | --- |
+| **Shares reach only players in the sender's world group who can see the sender, have `blueminimap.share.receive`, and haven't turned shares off** | live `suite.js` share group: one person, world group with the Nether, another world excluded, shares off, receive and send permissions, players hidden from the sender |
+| **A rules plugin (HouseRules) can remove recipients or cancel a share** | live share group (stand-in rules plugin); live `houserules.js` with the real HouseRules 0.2.0: shares stay inside circles, a no-circle sender in a circle-only world sends nothing |
+| **Fail closed with an older HouseRules: sharing off, admin told** | live `houserules.js` with the real HouseRules 0.1.1; unit `HouseRulesGuardTest` (including an unreadable version) |
+| **A server's "no" under an old permission name still stops sharing** | live share group "An old bluemaphud.share.receive/send false still stops…"; unit `PermsTest` (deny wins, admin grant wins, no noise when the old name changed nothing) |
+| Sharing limits: cooldown, console log, `share.enabled: false` | live share group |
+| Other players hidden by vanish, `hidePlayer`, spectator, invisibility, BlueMap, radius, other dimensions, `blueminimap.seeplayers` | live players group |
+| Players keep their HUD settings across the rename | unit `PlayerSettingsTest` (settings saved under the original keys still load) |
+| Upgrade from BlueMapHUD: folder copied, never overwritten | unit `MigrationTest` |
+| Everything else in the README (map accuracy, icons, clock, themes, one boss bar, updates, pack handling, life cycle, bad data, other setups) | the README's Testing list, check by check, in `test/live/suite.js`, `packurl.js`, `storage.js` and `backoff.js` |
+
+**Gaps added this audit:** none new. The old-name deny checks, the HouseRules joint test and the guard tests were added with 0.2.0 earlier the same day, and all passed on Paper 26.1.2, 26.2 and 26.3.
+
+**Skipped, with reasons:**
+- Pressing the buttons in the `/hud share` dialog: the bot's protocol library can't click a dialog button. The buttons call the same code `/hud share <names>` and `/hud share everyone` test.
+- How it looks in a real game client: the README's status line says so; it's on the real-client list.
