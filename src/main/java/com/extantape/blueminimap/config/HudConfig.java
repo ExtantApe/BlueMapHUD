@@ -48,7 +48,7 @@ public record HudConfig(
     public record Markers(boolean enabled, List<String> include, List<String> exclude, boolean edgeArrows,
                           boolean showDeath) {}
 
-    public record Pack(boolean send, boolean required, String kickMessage, String prompt, int port, String host,
+    public record Pack(boolean send, boolean required, String kickMessage, String prompt, int port, String bind, String host,
                        String publicUrl, boolean verifyPublicUrl, boolean hideBossBar, String bossBarColor, boolean bedrockExempt,
                        boolean reSendOnRemoval) {}
 
@@ -124,6 +124,7 @@ public record HudConfig(
                 c.getString("pack.kick-message", "This server needs the BlueMinimap resource pack."),
                 c.getString("pack.prompt", ""),
                 c.getInt("pack.port", 8164),
+                c.getString("pack.bind", "").trim(),
                 c.getString("pack.host", ""),
                 c.getString("pack.public-url", "").trim(),
                 c.getBoolean("pack.verify-public-url", true),

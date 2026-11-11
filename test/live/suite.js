@@ -18,7 +18,7 @@ const liveBots = []; // Quit after each group, so a crash can't leave a duplicat
 /** The shipped config with this server's ports. The clock is off unless a group turns it on, so idle tests stay idle. */
 function baseConfig(edits = {}) {
   fs.copyFileSync(path.join(REPO, 'src/main/resources/config.yml'), CFG);
-  editYaml(CFG, { 'pack.port': packPort, 'tiles.http-url': `http://127.0.0.1:${webPort}`, 'hud.clock.enabled': false, ...edits });
+  editYaml(CFG, { 'pack.port': packPort, 'pack.bind': '127.0.0.1', 'tiles.http-url': `http://127.0.0.1:${webPort}`, 'hud.clock.enabled': false, ...edits });
 }
 async function reload(expectPush) {
   const m = s.mark(); s.cmd('blueminimap reload');
@@ -497,6 +497,14 @@ const GROUPS = {
     check('Pack is marked required', b.pushes[0]?.forced === true);
     check('Pack URL uses the address the player connected to', /^http:\/\/127\.0\.0\.1:/.test(b.pushes[0]?.url || ''), b.pushes[0]?.url);
     check('Pack downloads with a matching SHA-1', b.packSha === b.pushes[0]?.hash, b.packSha);
+    // pack.bind: 127.0.0.1 (every group uses it). The download above came through loopback; this Mac's own
+    // network address must be refused, so the port never reaches the LAN or the internet.
+    const net = require('net'), os = require('os');
+    const lan = Object.values(os.networkInterfaces()).flat().find((i) => i && !i.internal && i.family === 'IPv4')?.address;
+    const reach = (host) => new Promise((res) => { const c = net.connect(packPort, host); c.once('connect', () => { c.destroy(); res(true); }); c.once('error', () => res(false)); setTimeout(() => { c.destroy(); res(false); }, 3000); });
+    check('pack.bind 127.0.0.1: the pack port answers on loopback', await reach('127.0.0.1'));
+    if (!lan) skip("pack.bind 127.0.0.1: refused on this machine's network address", 'no non-loopback IPv4 address here');
+    else check("pack.bind 127.0.0.1: refused on this machine's network address", !(await reach(lan)), lan);
     const pk = packOf(b);
     const adv = gameAdvances(b.packBytes);
     if (!adv) skip("This test's advances match the game's own font code", 'set BMH_CLIENT_CP to a Minecraft client classpath to run it');

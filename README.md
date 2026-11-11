@@ -20,7 +20,7 @@ These minimums come from BlueMap's release notes. Only BlueMap 5.29 was tested, 
 ## Install
 
 1. Put `BlueMinimap-<version>.jar` in `plugins/`, next to BlueMap.
-2. Open port `8164` so players can download the pack, or set `pack.public-url` to host it elsewhere. Servers sharing a machine each need their own `pack.port`.
+2. Open port `8164` so players can download the pack, or set `pack.public-url` to host it elsewhere. Servers sharing a machine each need their own `pack.port`. `pack.bind` picks the address it listens on (empty means every address); `127.0.0.1` keeps it on the server's own machine, for when the pack reaches players another way.
 3. Start the server. Settings are in `plugins/BlueMinimap/config.yml`.
 
 If BlueMap stores its maps in SQL, set `tiles.source: http`.

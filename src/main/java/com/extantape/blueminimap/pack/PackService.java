@@ -49,6 +49,7 @@ public final class PackService {
     private HudConfig.Pack config;
     private volatile PackBuilder.Built pack;
     private HttpServer server;
+    private String serverBind = "";
     private int serverPort = -1;
     private volatile String servedPath = "";
     private volatile byte[] servedBytes = new byte[0];
@@ -68,7 +69,7 @@ public final class PackService {
         Files.write(exportPath(), built.zip());
         servedPath = "/blueminimap-" + built.sha1Hex() + ".zip";
         servedBytes = built.zip();
-        if (config.send() && config.publicUrl().isBlank()) startServer(config.port());
+        if (config.send() && config.publicUrl().isBlank()) startServer(config.port(), config.bind());
         else stopServer();
         if (!config.send()) checkMergedPackAsync();
         else if (!config.publicUrl().isBlank()) checkPublicUrlAsync();
@@ -193,16 +194,28 @@ public final class PackService {
         return URI.create("http://" + host + ":" + serverPort + servedPath);
     }
 
-    private void startServer(int port) throws IOException {
-        if (server != null && serverPort == port) return;
+    private void startServer(int port, String bind) throws IOException {
+        if (server != null && serverPort == port && bind.equals(serverBind)) return;
         stopServer();
+        InetSocketAddress address = listenAddress(port, bind);
+        if (address == null) {
+            // A typo must never fall back to listening on every address.
+            plugin.getLogger().severe("pack.bind is \"" + bind + "\", which isn't an IP address, so the resource pack isn't hosted and the map stays hidden."
+                    + " Use an address such as 127.0.0.1, or leave it empty to listen on every address.");
+            return;
+        }
         try {
-            server = HttpServer.create(new InetSocketAddress(port), 16);
+            server = HttpServer.create(address, 16);
         } catch (BindException e) {
             // Sending a dead URL would kick everyone when the pack is required, so send nothing instead.
             plugin.getLogger().severe("Port " + port + " is already in use, so the resource pack can't be hosted and the map stays hidden."
                     + " Set pack.port to a free port, or set pack.public-url.");
             return;
+        }
+        serverBind = bind;
+        if (!bind.isEmpty() && address.getAddress().isLoopbackAddress()) {
+            plugin.getLogger().info("The resource pack is served on " + bind + ":" + port + " only, so only players on this machine can download it from here."
+                    + " Players elsewhere need pack.public-url (or pack.send: false with the files merged into your own pack).");
         }
         server.setExecutor(Executors.newFixedThreadPool(2, runnable -> {
             Thread thread = new Thread(runnable, "BlueMinimap-pack");
@@ -297,5 +310,15 @@ public final class PackService {
                 Thread.currentThread().interrupt();
             }
         });
+    }
+
+    /** Where the pack server listens: every address when {@code bind} is empty, or that IP address. Null if it isn't one. */
+    static InetSocketAddress listenAddress(int port, String bind) {
+        if (bind.isEmpty()) return new InetSocketAddress(port);
+        try {
+            return new InetSocketAddress(java.net.InetAddress.ofLiteral(bind), port);
+        } catch (IllegalArgumentException notAnAddress) {
+            return null;
+        }
     }
 }
