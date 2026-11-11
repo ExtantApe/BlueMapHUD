@@ -104,6 +104,11 @@ pack:
   kick-message: "This server needs the BlueMinimap resource pack."
   prompt: "BlueMinimap draws the map with this small resource pack."
   port: 8164
+  # Address the pack server listens on. Empty listens on every address, as before. 127.0.0.1 keeps it on
+  # this machine only: then only players on this machine can download from it, so use pack.public-url (or
+  # send: false with the files in your own pack) for everyone else. Anything that isn't an IP address stops
+  # the pack server rather than listening everywhere.
+  bind: ""
   # Host players download from. Empty uses the address they connected to.
   host: ""
   # Host the pack elsewhere, such as a CDN or GitHub release. Overrides the port.

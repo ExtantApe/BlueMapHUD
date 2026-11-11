@@ -2,6 +2,17 @@
 
 Kept by this repo's owning session (Minecraft: Plugins Lead), per `~/Code/CLAUDE.md`, "Test self-audits". Newest first.
 
+## 2026-11-10: pack.bind (0.2.1)
+
+| Promise | Covered by |
+| --- | --- |
+| Empty `pack.bind` listens on every address, as before | unit `ListenAddressTest.emptyListensOnEveryAddressAsBefore` |
+| `127.0.0.1` keeps the pack server on this machine: it answers on loopback, refuses the machine's network address, and downloads from loopback still work | unit `loopbackStaysOnThisMachine`, `aServerReallyListensOnlyWhereTold`; live "pack.bind 127.0.0.1: the pack port answers on loopback", "…refused on this machine's network address", and every pack download in the suite (all groups now run with it) |
+| A host name or typo never widens to every address | unit `aHostNameOrTypoIsRefusedNotWidened` |
+
+Live suite 335/335 on Paper 26.1.2.
+
+
 ## 2026-11-09: first full audit (at 0.2.0)
 
 The README's Testing section already lists what the live suite covers, check by check, so this audit starts from the promises that matter most for children's safety and privacy and for failing closed, then confirms the rest map to the Testing list.
